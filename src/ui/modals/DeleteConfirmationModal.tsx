@@ -1,0 +1,177 @@
+import { View, Modal, StyleSheet, Animated, TouchableWithoutFeedback, ViewStyle, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { colors } from '../../utils/colors';
+import { FontBold, FontMedium, FontRegular, FontSemiBold } from '../../utils/fontFamily';
+import { font14, font16, font18 } from '../../utils/fontSizes';
+import { resHeight, resAvarage, resWidth, scaleSize } from '../../utils/responsive';
+import CustomText from '../components/CustomText';
+import Cross from '../../assets/images/icons/cross.svg';
+
+interface DeleteConfirmationModalProps {
+    show: boolean;
+    setShow: (show: boolean) => void;
+    onConfirm: () => void;
+    title: string;
+    description: string;
+    confirmText?: string;
+}
+
+export default function DeleteConfirmationModal({
+    show,
+    setShow,
+    onConfirm,
+    title,
+    description,
+    confirmText = 'Delete'
+}: DeleteConfirmationModalProps) {
+    const transformY = useRef(new Animated.Value(resHeight(100))).current;
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        if (show) {
+            Animated.timing(fadeAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+            }).start();
+
+            Animated.timing(transformY, {
+                duration: 350,
+                useNativeDriver: true,
+                toValue: 0,
+            }).start();
+        }
+    }, [show]);
+
+    const close = () => {
+        Animated.timing(fadeAnim, {
+            toValue: 0,
+            duration: 250,
+            useNativeDriver: true,
+        }).start();
+
+        Animated.timing(transformY, {
+            toValue: resHeight(100),
+            duration: 250,
+            useNativeDriver: true,
+        }).start(() => setShow(false));
+    };
+
+    const handleConfirm = () => {
+        onConfirm();
+        close();
+    };
+
+    return (
+        <Modal
+            transparent
+            visible={show}
+            animationType="none"
+            onRequestClose={close}
+        >
+            <TouchableWithoutFeedback onPress={close}>
+                <Animated.View style={[styles.main, { opacity: fadeAnim }]}>
+                    <TouchableWithoutFeedback>
+                        <Animated.View
+                            style={[
+                                styles.box,
+                                { transform: [{ translateY: transformY }] } as ViewStyle,
+                            ]}
+                        >
+                            <View style={styles.header}>
+                                <CustomText style={styles.title}>{title}</CustomText>
+                                <TouchableOpacity onPress={close} activeOpacity={0.7} style={styles.closeBtn}>
+                                    <Cross width={resAvarage(4)} height={resAvarage(4)} fill={colors.black} />
+                                </TouchableOpacity>
+                            </View>
+
+                            <CustomText style={styles.description}>
+                                {description}
+                            </CustomText>
+
+                            <View style={styles.footer}>
+                                <TouchableOpacity onPress={close} activeOpacity={0.8} style={styles.cancelBtn}>
+                                    <CustomText style={styles.cancelBtnText}>Cancel</CustomText>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={handleConfirm} activeOpacity={0.8} style={styles.deleteBtn}>
+                                    <CustomText style={styles.deleteBtnText}>{confirmText}</CustomText>
+                                </TouchableOpacity>
+                            </View>
+                        </Animated.View>
+                    </TouchableWithoutFeedback>
+                </Animated.View>
+            </TouchableWithoutFeedback>
+        </Modal>
+    );
+}
+
+const styles = StyleSheet.create({
+    main: {
+        flex: 1,
+        backgroundColor: '#00000080',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    box: {
+        backgroundColor: colors.bgWhite,
+        borderRadius: scaleSize(12),
+        width: resWidth(90),
+        paddingVertical: resAvarage(4),
+        paddingHorizontal: resAvarage(3),
+        gap: resAvarage(2.5),
+        borderWidth: 1,
+        borderColor: 'rgba(20, 20, 20, 0.08)',
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    title: {
+        fontFamily: FontBold,
+        fontSize: font18,
+        color: colors.black,
+    },
+    closeBtn: {
+        padding: resAvarage(1),
+    },
+    description: {
+        fontFamily: FontRegular,
+        fontSize: font14,
+        color: colors.black70,
+        lineHeight: font14 * 1.5,
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: resWidth(7),
+        marginTop: resAvarage(2),
+    },
+    cancelBtn: {
+        borderRadius: resAvarage(100),
+        borderWidth: 1.5,
+        borderColor: 'rgba(20, 20, 20, 0.15)',
+        paddingVertical: resAvarage(2),
+        paddingHorizontal: resWidth(6),
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    cancelBtnText: {
+        fontFamily: FontSemiBold,
+        fontSize: font14,
+        color: colors.black70,
+    },
+    deleteBtn: {
+        backgroundColor: colors.textRed,
+        borderRadius: resAvarage(100),
+        paddingVertical: resAvarage(2),
+        paddingHorizontal: resWidth(6),
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    deleteBtnText: {
+        fontFamily: FontSemiBold,
+        fontSize: font14,
+        color: colors.white,
+    },
+});

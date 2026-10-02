@@ -1,0 +1,73 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "assets/fonts/Cardo-Bold.ttf",
+      "sha1": "b29f4ca8d183e351b907b81204fbb5944dffe69a"
+    },
+    {
+      "path": "assets/fonts/Cardo-Regular.ttf",
+      "sha1": "ac5eb3f9a3b9c1e5aaf8a5c9b871ed89634d289f"
+    },
+    {
+      "path": "assets/fonts/Raleway-Bold.ttf",
+      "sha1": "633fc874da0a04f51950f11729651f14718778d4"
+    },
+    {
+      "path": "assets/fonts/Raleway-ExtraBold.ttf",
+      "sha1": "0aaae506e95b620dbfb937ed0f9e6a3ec559a825"
+    },
+    {
+      "path": "assets/fonts/Raleway-Light.ttf",
+      "sha1": "3da11b2e3b5f6c6b2e1b56e88de643353f4022c1"
+    },
+    {
+      "path": "assets/fonts/Raleway-Medium.ttf",
+      "sha1": "a9a82617db2caca029742885ea86e2384b512dc7"
+    },
+    {
+      "path": "assets/fonts/Raleway-Regular.ttf",
+      "sha1": "de56c2d00968cb63feda2bdf924a90b7079eec48"
+    },
+    {
+      "path": "assets/fonts/Raleway-SemiBold.ttf",
+      "sha1": "60b619bc3a65fbd7497eebca05550e916fbb0ac9"
+    },
+    {
+      "path": "assets/fonts/Raleway-Thin.ttf",
+      "sha1": "8acc6168b15f54bcb3fe9484b1a45d803bf99d9b"
+    },
+    {
+      "path": "assets/fonts/RobotoSerif-Bold.ttf",
+      "sha1": "7643866d3601dd98eb87cc65b140270c5ccb7355"
+    },
+    {
+      "path": "assets/fonts/RobotoSerif-ExtraBold.ttf",
+      "sha1": "829aa97535bde3f193f4ea9bce8802361645f4f9"
+    },
+    {
+      "path": "assets/fonts/RobotoSerif-ExtraLight.ttf",
+      "sha1": "86e9c9e904dd011f57536c96da0bc07b6fe662db"
+    },
+    {
+      "path": "assets/fonts/RobotoSerif-Light.ttf",
+      "sha1": "10bed9e4077a9a5f81adf41093680fbc9b0f45ae"
+    },
+    {
+      "path": "assets/fonts/RobotoSerif-Medium.ttf",
+      "sha1": "e5a03258334af080d1708be9f1d7f7e24cc7a8de"
+    },
+    {
+      "path": "assets/fonts/RobotoSerif-Regular.ttf",
+      "sha1": "9a773041f969339bc85d6e4690b13fb07875c49b"
+    },
+    {
+      "path": "assets/fonts/RobotoSerif-SemiBold.ttf",
+      "sha1": "0e100d2e8b4e069559a9c0e7ad4f1df84c60d6ea"
+    },
+    {
+      "path": "assets/fonts/RobotoSerif-Thin.ttf",
+      "sha1": "f31e60774d9c40038c3a0dbb224a33d3895a6070"
+    }
+  ]
+}
