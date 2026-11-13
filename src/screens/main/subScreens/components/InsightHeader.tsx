@@ -9,7 +9,7 @@ import Back from '../../../../assets/images/icons/back.svg';
 import { colors } from '../../../../utils/colors';
 import { goBack } from '../../../../navigation/NavigationUtils';
 
-export default function InsightHeader({ title, subtitle }: any) {
+export default function InsightHeader({ title, subtitle, rightComponent }: any) {
     return (
         <View style={styles.main}>
             <View style={styles.row} >
@@ -21,6 +21,7 @@ export default function InsightHeader({ title, subtitle }: any) {
                     <CustomText style={styles.header}>{subtitle}</CustomText>
                 </View>
             </View>
+            {rightComponent}
         </View>
     )
 }

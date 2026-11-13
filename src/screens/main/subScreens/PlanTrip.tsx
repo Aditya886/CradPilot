@@ -18,11 +18,16 @@ import AddNewPlanModal from '../../../ui/modals/AddNewPlanModal'
 import DeleteConfirmationModal from '../../../ui/modals/DeleteConfirmationModal'
 import EmptyStateCard from '../../../ui/components/EmptyStateCard'
 import BudgetIcon from '../../../assets/images/icons/budget.svg'
+import ExportImportButton from '../../../ui/components/ExportImportButton'
+import ExportImportModal from '../../../ui/modals/ExportImportModal'
+import { ExportColumn } from '../../../services/exportService'
+import { importService } from '../../../services/importService'
 
 export default function Insights() {
     const [selected, setSelected] = useState("All")
     const [showNewPlanModal, setShowNewPlanModal] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [showExportModal, setShowExportModal] = useState(false)
     const [planToDelete, setPlanToDelete] = useState<PlanItemData | null>(null)
     const [plansList, setPlansList] = useState<PlanItemData[]>([])
 
@@ -147,10 +152,53 @@ export default function Insights() {
         setShowDeleteModal(true)
     }
 
+    const tripExportColumns: ExportColumn[] = [
+        { key: 'title', label: 'Trip / Plan Title' },
+        { key: 'type', label: 'Type' },
+        { key: 'total', label: 'Total Budget (₹)', type: 'currency' },
+        { key: 'spent', label: 'Spent Amount (₹)', type: 'currency' },
+        { key: 'tagText', label: 'Status / Left' },
+        { key: 'itemsCount', label: 'Items Count', type: 'number' },
+        { key: 'peopleCount', label: 'People Count', type: 'number' },
+    ];
+
+    const sampleTripCsv = `Trip / Plan Title,Type,Total Budget (₹),Expense,Paid By,Amount (₹),Date
+Goa Trip,Group,25000,Resort Booking,Rahul,12000,2026-10-18
+Goa Trip,Group,25000,Dinner & Drinks,Sneha,4500,2026-10-19
+Weekend Getaway,Single,8000,Fuel & Toll,You,2500,2026-10-15`;
+
     return (
         <CommonBg>
             <View style={{ flex: 1 }} >
-                <InsightHeader title={"Plans & Trips"} subtitle={"My Budget plans"} />
+                <InsightHeader
+                    title={"Plans & Trips"}
+                    subtitle={"My Budget plans"}
+                    rightComponent={
+                        <ExportImportButton onPress={() => setShowExportModal(true)} />
+                    }
+                />
+
+                <ExportImportModal
+                    visible={showExportModal}
+                    onClose={() => setShowExportModal(false)}
+                    sectionTitle="Plans & Trips"
+                    sectionSubtitle="Budget Plans & Travel Expenses"
+                    exportColumns={tripExportColumns}
+                    exportRows={plansList}
+                    exportSummary={{
+                        'Total Plans Tracked': plansList.length,
+                        'Total Allocated Budget': `₹${planTotals.totalLent + planTotals.interestEarned}`,
+                        'Total Expenses Spent': `₹${planTotals.totalLent}`,
+                        'Total Remaining Budget': `₹${planTotals.interestEarned}`,
+                    }}
+                    defaultFilename={`CredPilot_PlansAndTrips_${new Date().toISOString().split('T')[0]}`}
+                    sampleImportFormat={sampleTripCsv}
+                    onImportData={async (rawInput) => {
+                        const result = await importService.importTripPlan(rawInput);
+                        loadPlansFromDB();
+                        return result;
+                    }}
+                />
                 <ScrollView showsVerticalScrollIndicator={false}>
                     <PlanMainCard totals={planTotals} />
                     <View style={[styles.row, { marginHorizontal: resAvarage(3), marginVertical: resAvarage(3) }]} >

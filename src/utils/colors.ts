@@ -97,4 +97,7 @@ export const colors = {
     optionPurple: "#BA59FE15",
     optionRed: "#CF4630",
 
+    // Aliases for compatibility
+    primery: "#CDFA27",
+    secondary: "#141414",
 }

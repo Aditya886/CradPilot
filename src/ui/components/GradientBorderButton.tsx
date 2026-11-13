@@ -61,7 +61,7 @@ const GradientBorderButton: React.FC<CustomButtonProps> = ({
     rounded = true,
     size = 'medium',
     backgroundColor = colors.bgColor,
-    textColor = colors.primery,
+    textColor = colors.primery || colors.black || '#000000',
     throttleDelay = 800,
 }) => {
     const isThrottled = useRef(false);
@@ -94,14 +94,14 @@ const GradientBorderButton: React.FC<CustomButtonProps> = ({
     return (
         <View style={[styles.wrapper, { borderRadius }, innerstyle]}>
             <CommonRippleButton
-                rippleColor={rippleColor ? rippleColor : colors.primery}
+                rippleColor={rippleColor ? rippleColor : (colors.primery || colors.theme || '#CDFA27')}
                 onPress={handlePress}
                 style={{ borderRadius }}
                 rippleOpacity={0.4}
             >
                 {/* 🔥 Gradient Border Layer */}
                 <LinearGradient
-                    colors={[colors.primery, colors.secondary]}
+                    colors={[colors.primery || colors.theme || '#CDFA27', colors.secondary || colors.black || '#141414']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={{

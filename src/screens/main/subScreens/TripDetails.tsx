@@ -16,10 +16,13 @@ import DeleteIcon from '../../../assets/images/icons/delete.svg'
 import AddSpendModal from '../../../ui/modals/AddSpendModal'
 import AddPersonsModal from '../../../ui/modals/AddPersonsModal'
 import SplitFilterModal from '../../../ui/modals/SplitFilterModal'
-import DeleteConfirmationModal from '../../../ui/modals/DeleteConfirmationModal'
 import { query, insert, removeWhere, update } from '../../../storage/local/sqlite'
 import { goBack } from '../../../navigation/NavigationUtils'
 import { useFocusEffect } from '@react-navigation/native'
+import ExportImportButton from '../../../ui/components/ExportImportButton'
+import ExportImportModal from '../../../ui/modals/ExportImportModal'
+import { ExportColumn } from '../../../services/exportService'
+import { importService } from '../../../services/importService'
 
 interface MemberData {
     id: string
@@ -57,6 +60,7 @@ export default function TripDetails({ route }: any) {
     const [deleteType, setDeleteType] = useState<'plan' | 'person' | 'spend' | null>(null)
     const [itemToDelete, setItemToDelete] = useState<any>(null)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
+    const [showExportModal, setShowExportModal] = useState(false)
 
     const [currentPlan, setCurrentPlan] = useState<any>(plan || {})
     const [membersList, setMembersList] = useState<MemberData[]>([])
@@ -293,20 +297,87 @@ export default function TripDetails({ route }: any) {
     return (
         <CommonBg>
             <View style={{ flex: 1 }}>
-                {/* Header with Title & Delete Plan button */}
+                {/* Header with Title, Export/Import, & Delete Plan button */}
                 <View style={styles.topHeaderRow}>
                     <View style={{ flex: 1 }}>
                         <InsightHeader title="Plans & Trips" subtitle={planTitle} />
                     </View>
-                    <TouchableOpacity
-                        activeOpacity={0.7}
-                        onPress={triggerDeletePlan}
-                        style={styles.headerDeleteBtn}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        <DeleteIcon width={resAvarage(4.2)} height={resAvarage(4.2)} />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: resAvarage(1), marginRight: resAvarage(2) }}>
+                        <ExportImportButton onPress={() => setShowExportModal(true)} />
+                        <TouchableOpacity
+                            activeOpacity={0.7}
+                            onPress={triggerDeletePlan}
+                            style={styles.headerDeleteBtn}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <DeleteIcon width={resAvarage(4.2)} height={resAvarage(4.2)} />
+                        </TouchableOpacity>
+                    </View>
                 </View>
+
+                <ExportImportModal
+                    visible={showExportModal}
+                    onClose={() => setShowExportModal(false)}
+                    sectionTitle={`Trip: ${planTitle}`}
+                    sectionSubtitle="Expenses, Member Shares & Budget"
+                    exportColumns={[
+                        { key: 'title', label: 'Expense Item' },
+                        { key: 'amount', label: 'Amount (₹)', type: 'currency' },
+                        { key: 'paidBy', label: 'Paid By' },
+                        { key: 'date', label: 'Date' },
+                    ]}
+                    exportRows={spendsList}
+                    exportSummary={{
+                        'Trip Name': planTitle,
+                        'Total Allocated Budget': formatINR(totalBudget),
+                        'Total Spent': formatINR(totalSpent),
+                        'Remaining / Balance': formatINR(Math.max(0, totalBudget - totalSpent)),
+                        'Total Spends Logged': spendsList.length,
+                        'Members Count': membersList.length,
+                    }}
+                    defaultFilename={`CredPilot_Trip_${planTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`}
+                    sampleImportFormat={`Expense Item,Amount (₹),Paid By,Date\nHotel Booking,7500,You,2026-10-18\nDinner & Food,2200,Rahul,2026-10-19\nTaxi & Transport,1400,Sneha,2026-10-20`}
+                    onImportData={async (rawInput) => {
+                        const { rows } = importService.parseTabularData(rawInput);
+                        if (rows.length === 0) {
+                            return { success: false, message: 'No valid expense rows found', rowCount: 0 };
+                        }
+                        let added = 0;
+                        rows.forEach(r => {
+                            const title = r['title'] || r['expenseitem'] || r['expense'] || r['item'] || '';
+                            const amount = parseFloat(r['amount'] || r['cost'] || '0') || 0;
+                            const paidBy = r['paidby'] || r['member'] || 'You';
+                            const date = r['date'] || new Date().toISOString().split('T')[0];
+
+                            if (title && amount > 0 && planIdNum) {
+                                insert('plan_spends', {
+                                    plan_id: planIdNum,
+                                    title,
+                                    amount,
+                                    paid_by: paidBy,
+                                    date,
+                                });
+                                // Also ensure member is in plan_members
+                                const existing = query('SELECT id FROM plan_members WHERE plan_id = ? AND LOWER(name) = ?', [planIdNum, paidBy.toLowerCase()]);
+                                if (!existing || existing.length === 0) {
+                                    insert('plan_members', {
+                                        plan_id: planIdNum,
+                                        name: paidBy,
+                                        paid: amount,
+                                        owes: 0,
+                                    });
+                                }
+                                added++;
+                            }
+                        });
+                        loadDataFromDB();
+                        return {
+                            success: true,
+                            message: `Imported ${added} expense items into "${planTitle}"!`,
+                            rowCount: added,
+                        };
+                    }}
+                />
 
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                     {/* GROUP BUDGET Card */}

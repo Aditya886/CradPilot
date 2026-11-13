@@ -18,8 +18,17 @@ import AddEntery from "../screens/main/subScreens/AddEntery";
 import DebtPersonDetails from "../screens/main/subScreens/DebtPersonDetails";
 import PlanTrip from "../screens/main/subScreens/PlanTrip";
 import TripDetails from "../screens/main/subScreens/TripDetails";
+import TutionSection from "../screens/main/subScreens/tution/TutionSection";
+import Students from "../screens/main/subScreens/tution/Students";
+import StudentDetails from "../screens/main/subScreens/tution/StudentDetails";
+import PendingFees from "../screens/main/subScreens/tution/PendingFees";
+import Attendance from "../screens/main/subScreens/tution/Attendance";
+import Batch from "../screens/main/subScreens/tution/Batch";
+import AddStudent from "../screens/main/subScreens/tution/AddStudent";
+import WebViewScreen from "../screens/main/subScreens/WebViewScreen";
 
 const Stack = createNativeStackNavigator<any>();
+
 
 export const StackNavigation = () => {
     return (
@@ -115,6 +124,82 @@ export const StackNavigation = () => {
             <Stack.Screen
                 name="TripDetails"
                 component={TripDetails}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="TutionSection"
+                component={TutionSection}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="Students"
+                component={Students}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="StudentDetails"
+                component={StudentDetails}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="PendingFees"
+                component={PendingFees}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="Attendance"
+                component={Attendance}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="Batch"
+                component={Batch}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="AddStudent"
+                component={AddStudent}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="WebViewScreen"
+                component={WebViewScreen}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="PrivacyPolicy"
+                component={(props: any) => (
+                    <WebViewScreen
+                        {...props}
+                        route={{
+                            ...props.route,
+                            params: {
+                                title: "Privacy Policy",
+                                subtitle: "Legal & Data Policy",
+                                url: "https://credpilot.vercel.app/#/privacy",
+                                ...props.route?.params,
+                            },
+                        }}
+                    />
+                )}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="TermsAndConditions"
+                component={(props: any) => (
+                    <WebViewScreen
+                        {...props}
+                        route={{
+                            ...props.route,
+                            params: {
+                                title: "Terms & Conditions",
+                                subtitle: "Agreement & Rules",
+                                url: "https://credpilot.vercel.app/#/terms",
+                                ...props.route?.params,
+                            },
+                        }}
+                    />
+                )}
                 options={{ headerShown: false }}
             />
         </Stack.Navigator>

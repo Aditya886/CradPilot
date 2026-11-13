@@ -58,26 +58,6 @@
 	<false/>
 	<key>UIAppFonts</key>
 	<array>
-		<string>SourceCodePro-SemiBold.ttf</string>
-		<string>Inconsolata-SemiBold.ttf</string>
-		<string>PlayfairDisplay-Bold.ttf</string>
-		<string>SourceCodePro-Medium.ttf</string>
-		<string>Inconsolata-Medium.ttf</string>
-		<string>PlayfairDisplay-SemiBold.ttf</string>
-		<string>PlayfairDisplay-Medium.ttf</string>
-		<string>SourceCodePro-Light.ttf</string>
-		<string>PlayfairDisplay-VariableFont_wght.ttf</string>
-		<string>Inconsolata-ExtraLight.ttf</string>
-		<string>SourceCodePro-ExtraLight.ttf</string>
-		<string>SourceCodePro-Regular.ttf</string>
-		<string>PlayfairDisplay-Regular.ttf</string>
-		<string>Inconsolata-Bold.ttf</string>
-		<string>Inconsolata-ExtraBold.ttf</string>
-		<string>Inconsolata-Light.ttf</string>
-		<string>Inconsolata-Regular.ttf</string>
-		<string>PlayfairDisplay-ExtraBold.ttf</string>
-		<string>SourceCodePro-Bold.ttf</string>
-		<string>SourceCodePro-ExtraBold.ttf</string>
 		<string>Cardo-Bold.ttf</string>
 		<string>RobotoSerif-Medium.ttf</string>
 		<string>RobotoSerif-ExtraLight.ttf</string>

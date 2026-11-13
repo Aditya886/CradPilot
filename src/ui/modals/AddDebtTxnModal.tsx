@@ -343,6 +343,11 @@ const styles = StyleSheet.create({
         width: resWidth(82),
         alignSelf: 'center',
     },
+    label: {
+        fontSize: font12,
+        fontFamily: FontMedium,
+        color: colors.black70,
+    },
     footer: {
         flexDirection: 'row',
         justifyContent: 'space-between',

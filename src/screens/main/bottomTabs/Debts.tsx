@@ -22,6 +22,10 @@ import { query } from '../../../storage/local/sqlite'
 import { useFocusEffect } from '@react-navigation/native'
 import AddDebtPersonModal from '../../../ui/modals/AddDebtPersonModal'
 import AddDebtTxnModal from '../../../ui/modals/AddDebtTxnModal'
+import ExportImportButton from '../../../ui/components/ExportImportButton'
+import ExportImportModal from '../../../ui/modals/ExportImportModal'
+import { ExportColumn } from '../../../services/exportService'
+import { importService } from '../../../services/importService'
 
 export default function Debts({ route, navigation }: any) {
     const [selected, setSelected] = useState("Home")
@@ -34,6 +38,7 @@ export default function Debts({ route, navigation }: any) {
 
     const [showAddPersonModal, setShowAddPersonModal] = useState(false)
     const [showAddTxnModal, setShowAddTxnModal] = useState(false)
+    const [showExportModal, setShowExportModal] = useState(false)
 
     const loadDebtsData = () => {
         try {
@@ -173,9 +178,59 @@ export default function Debts({ route, navigation }: any) {
         return filteredTxnsCount > 3;
     }, [selected, pendingSettlements, recentActivityData, filteredPersons, filteredTxnsCount]);
 
+    const debtExportColumns: ExportColumn[] = [
+        { key: 'name', label: 'Person Name' },
+        { key: 'phone', label: 'Phone' },
+        { key: 'remain', label: 'Balance (₹)', type: 'currency' },
+        { key: 'statusText', label: 'Status' },
+        { key: 'lastUpdate', label: 'Last Activity' },
+        { key: 'txnsCount', label: 'Transactions', type: 'number' },
+    ];
+
+    const debtExportRows = React.useMemo(() => {
+        return debtPersons.map(p => ({
+            name: p.name,
+            phone: p.phone,
+            remain: p.remain,
+            statusText: p.remain > 0 ? "You'll receive" : p.remain < 0 ? 'You owe' : 'Settled',
+            lastUpdate: p.lastUpdate,
+            txnsCount: p.txnsCount,
+        }));
+    }, [debtPersons]);
+
+    const debtSampleCsv = `Person Name,Phone,Amount (₹),Type,Date,Mode,Notes
+Ramesh Patel,+91 98765 43210,1500,outgoing,2026-10-18,Cash,Lunch split
+Priya Sharma,+91 98112 33455,2000,incoming,2026-10-19,UPI,Advance return`;
+
     return (
         <CommonBg>
             <DebtsHeader selected={selected} setSelected={setSelected} />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: resAvarage(3), paddingBottom: resAvarage(1) }}>
+                <ExportImportButton onPress={() => setShowExportModal(true)} label="Debts Export / Import" />
+            </View>
+
+            <ExportImportModal
+                visible={showExportModal}
+                onClose={() => setShowExportModal(false)}
+                sectionTitle="Debts & Credit Ledger"
+                sectionSubtitle="Balances, People & Transactions"
+                exportColumns={debtExportColumns}
+                exportRows={debtExportRows}
+                exportSummary={{
+                    'Total You Will Receive': `₹${overallMetrics.totalReceive.toLocaleString()}`,
+                    'Total You Owe': `₹${overallMetrics.totalOwe.toLocaleString()}`,
+                    'Active Debt Contacts': debtPersons.length,
+                    'Total Transactions': debtTransactions.length,
+                }}
+                defaultFilename={`CredPilot_Debts_${new Date().toISOString().split('T')[0]}`}
+                sampleImportFormat={debtSampleCsv}
+                onImportData={async (rawInput) => {
+                    const result = await importService.importDebts(rawInput);
+                    loadDebtsData();
+                    return result;
+                }}
+            />
+
             <ScrollView
                 showsVerticalScrollIndicator={false}
             >

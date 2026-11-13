@@ -1,0 +1,13 @@
+{
+  "profile": {
+    "e": "Logout",
+    "e1": "Are you sure you want to log out?",
+    "e2": "Cancel",
+    "e3": "Logout",
+    "a9": "Sign Out"
+  },
+  "common": {
+    "enter_no": "Enter phone number"
+  }
+}
+

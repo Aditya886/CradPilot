@@ -14,10 +14,14 @@ import AsyncStorageUtils from '../../../../utils/storage'
 import { logoutOneSignalUser } from '../../../../services/oneSignalService'
 import { cancelAllLocalNotifications } from '../../../../services/localNotificationService'
 
-export default function MoreList({ data, title }: any) {
+export default function MoreList({ data, title, onLogoutPress }: any) {
     const dispatch = useAppDispatch();
     const handlePress = async (item: any) => {
         if (item?.title === "Logout") {
+            if (onLogoutPress) {
+                onLogoutPress();
+                return;
+            }
             try {
                 // Clear user session from storage
                 await AsyncStorageUtils.removeItem('user_session');
@@ -53,11 +57,22 @@ export default function MoreList({ data, title }: any) {
         if (item?.title === "Plans & Trips") {
             navigate("PlanTrip")
         }
+        if (item?.title === "Tution") {
+            navigate("TutionSection")
+        }
         if (item?.title === "Terms & conditions") {
-            // navigate("TermsAndConditions")
+            navigate("WebViewScreen", {
+                title: "Terms & Conditions",
+                subtitle: "Agreement & Rules",
+                url: "https://credpilot.vercel.app/#/terms",
+            });
         }
         if (item?.title === "Privacy Policy") {
-            // navigate("PrivacyPolicy")
+            navigate("WebViewScreen", {
+                title: "Privacy Policy",
+                subtitle: "Legal & Data Policy",
+                url: "https://credpilot.vercel.app/#/privacy",
+            });
         }
         if (item?.title === "About CredPilot") {
             // navigate("AboutCredPilot")

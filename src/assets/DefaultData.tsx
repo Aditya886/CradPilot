@@ -8,7 +8,7 @@ import Budget from "./images/icons/budget.svg"
 import Terms from "./images/icons/terms.svg"
 import Policy from "./images/icons/policy.svg"
 import About from "./images/icons/about.svg"
-import Finance from "./images/icons/finance.svg"
+import Tution from "./images/icons/tution.svg"
 
 export const ACCOUNT_TYPES = [
     {
@@ -98,6 +98,12 @@ export const MoreFeatureList = [
         title: "Plans & Trips",
         subtitle: "Track all your plans and trips",
         icon: Budget
+    },
+    {
+        id: 5,
+        title: "Tution",
+        subtitle: "Students, Fees & Payments",
+        icon: Tution
     },
 ]
 export const aboutList = [

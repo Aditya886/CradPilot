@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CredPilot — Master Your Wealth. Simplify Your Lending.</title>
+  
+  <!-- Tailwind CSS CDN with custom brand color support -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: '#CCFF00',
+            dark: '#121316',
+            sage: '#B8C4B4',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- React 18, ReactDOM & Babel Standalone for direct in-browser JSX parsing -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Lucide React Icons UMD CDN -->
+  <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.min.js"></script>
+
+  <style>
+    /* Smooth page scroll & typography settings */
+    html {
+      scroll-behavior: smooth;
+    }
+    body {
+      background-color: #F4F5F7;
+      color: #121316;
+      margin: 0;
+      overflow-x: hidden;
+    }
+    /* Hide native cursor on desktop to prioritize custom neon ring cursor */
+    @media (min-width: 768px) {
+      body {
+        cursor: none;
+      }
+      a, button, input, select {
+        cursor: none !important;
+      }
+    }
+    /* Smooth in/out scroll animation classes */
+    .reveal-on-scroll {
+      opacity: 0;
+      transform: translateY(32px) scale(0.98);
+      transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+      will-change: opacity, transform;
+    }
+    .reveal-on-scroll.is-visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.97); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-fadeIn {
+      animation: fadeIn 0.35s ease-out forwards;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // Destructure Lucide icons from window with SVG fallbacks
+    const icons = window.lucideReact || {};
+    const {
+      Wallet = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>,
+      Users = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+      Lock = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+      ArrowRight = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>,
+      Play = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" {...p}><polygon points="6 3 20 12 6 21 6 3"/></svg>,
+      CheckCircle2 = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>,
+      Sparkles = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>,
+      TrendingUp = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
+      FileText = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>,
+      DollarSign = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+      ShieldCheck = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>,
+      ChevronRight = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="m9 18 6-6-6-6"/></svg>,
+      Smartphone = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>,
+      Calendar = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>,
+      Download = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+      Fingerprint = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 3"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg>,
+      Plus = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M5 12h14"/><path d="M12 5v14"/></svg>,
+      Scan = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>,
+      ArrowLeftRight = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="m9 7-5 5 5 5"/><path d="m15 17 5-5-5-5"/><path d="M4 12h16"/></svg>,
+      Bell = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>,
+      Star = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+      ExternalLink = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>,
+      Scale = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>,
+      Calculator = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>,
+      ArrowUpRight = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>,
+      Apple = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" {...p}><path d="M12 20.94c1.5 0 2.75-1.06 4-1.06 1.22 0 2.28 1.06 3.88 1.06 1.84 0 3.31-1.59 4.12-3.13-2.31-1.22-2.31-4.62.16-5.84-1.16-2.12-3.25-2.28-4.06-2.28-1.5 0-2.81 1-3.62 1-.84 0-2.03-1-3.34-1-2.41 0-4.66 1.72-4.66 5.12 0 3.41 2.25 7.13 4.52 7.13Z"/><path d="M15.5 3c-.19 1.16-.94 2.19-1.91 2.84.19-.94.75-1.97 1.91-2.84Z"/></svg>,
+      QrCode = (p) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...p}><rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>
+    } = icons;
+
+    function useScrollAnimation() {
+      useEffect(() => {
+        const observerCallback = (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-visible');
+            } else {
+              entry.target.classList.remove('is-visible');
+            }
+          });
+        };
+
+        const observer = new IntersectionObserver(observerCallback, {
+          threshold: 0.12,
+          rootMargin: '0px 0px -40px 0px'
+        });
+
+        const animatedElements = document.querySelectorAll('.reveal-on-scroll');
+        animatedElements.forEach((el) => observer.observe(el));
+
+        return () => observer.disconnect();
+      });
+    }
+
+    const CustomCursor = () => {
+      const [position, setPosition] = useState({ x: -100, y: -100 });
+      const [trailer, setTrailer] = useState({ x: -100, y: -100 });
+      const [isHovered, setIsHovered] = useState(false);
+      const [isClicking, setIsClicking] = useState(false);
+
+      useEffect(() => {
+        const handleMouseMove = (e) => {
+          setPosition({ x: e.clientX, y: e.clientY });
+        };
+        const handleMouseDown = () => setIsClicking(true);
+        const handleMouseUp = () => setIsClicking(false);
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mousedown', handleMouseDown);
+        window.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('mousedown', handleMouseDown);
+          window.removeEventListener('mouseup', handleMouseUp);
+        };
+      }, []);
+
+      useEffect(() => {
+        let animId;
+        const follow = () => {
+          setTrailer((prev) => ({
+            x: prev.x + (position.x - prev.x) * 0.22,
+            y: prev.y + (position.y - prev.y) * 0.22,
+          }));
+          animId = requestAnimationFrame(follow);
+        };
+        animId = requestAnimationFrame(follow);
+        return () => cancelAnimationFrame(animId);
+      }, [position]);
+
+      useEffect(() => {
+        const handleHoverCheck = () => {
+          const targets = document.querySelectorAll('button, a, input, select, [role="button"]');
+          targets.forEach((el) => {
+            el.addEventListener('mouseenter', () => setIsHovered(true));
+            el.addEventListener('mouseleave', () => setIsHovered(false));
+          });
+        };
+        handleHoverCheck();
+        const obs = new MutationObserver(handleHoverCheck);
+        obs.observe(document.body, { childList: true, subtree: true });
+        return () => obs.disconnect();
+      }, []);
+
+      return (
+        <>
+          <div
+            className="fixed pointer-events-none z-50 rounded-full transition-transform duration-150 ease-out border-2 border-[#CCFF00] bg-[#CCFF00]/10 backdrop-blur-[2px] hidden md:block"
+            style={{
+              left: `${trailer.x}px`,
+              top: `${trailer.y}px`,
+              transform: `translate(-50%, -50%) scale(${isClicking ? 2.2 : isHovered ? 1.85 : 1})`,
+              width: '32px',
+              height: '32px',
+              boxShadow: isClicking
+                ? '0 0 28px #CCFF00, 0 0 50px rgba(204, 255, 0, 0.6)'
+                : isHovered
+                ? '0 0 22px #CCFF00, inset 0 0 10px rgba(204, 255, 0, 0.4)'
+                : '0 0 14px rgba(204, 255, 0, 0.7)',
+            }}
+          />
+          <div
+            className="fixed pointer-events-none z-50 rounded-full transition-all duration-75 hidden md:block"
+            style={{
+              left: `${position.x}px`,
+              top: `${position.y}px`,
+              transform: `translate(-50%, -50%) scale(${isClicking ? 0.6 : isHovered ? 1.2 : 1})`,
+              width: '6px',
+              height: '6px',
+              backgroundColor: '#CCFF00',
+              boxShadow: '0 0 8px #CCFF00',
+            }}
+          />
+        </>
+      );
+    };
+
+    const InteractiveAppShowcase = () => {
+      const [activeScreen, setActiveScreen] = useState('debts');
+      const [activeAction, setActiveAction] = useState('scan');
+
+      return (
+        <div className="relative w-full max-w-[410px] mx-auto select-none">
+          <div className="absolute -inset-4 bg-gradient-to-tr from-[#CCFF00]/30 via-emerald-400/10 to-transparent rounded-[52px] blur-2xl opacity-70 pointer-events-none" />
+
+          {/* Screen Selector Tabs */}
+          <div className="flex items-center justify-center gap-1.5 p-1.5 mb-4 bg-white/90 backdrop-blur-md rounded-full border border-neutral-300/80 shadow-md">
+            <button
+              onClick={() => setActiveScreen('home')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                activeScreen === 'home'
+                  ? 'bg-[#121316] text-[#CCFF00] shadow-sm'
+                  : 'text-neutral-600 hover:text-black'
+              }`}
+            >
+              Home Flow
+            </button>
+            <button
+              onClick={() => setActiveScreen('debts')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                activeScreen === 'debts'
+                  ? 'bg-[#121316] text-[#CCFF00] shadow-sm'
+                  : 'text-neutral-600 hover:text-black'
+              }`}
+            >
+              Who Owes Whom
+            </button>
+            <button
+              onClick={() => setActiveScreen('lending')}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                activeScreen === 'lending'
+                  ? 'bg-[#121316] text-[#CCFF00] shadow-sm'
+                  : 'text-neutral-600 hover:text-black'
+              }`}
+            >
+              Lent ₹6.85L
+            </button>
+          </div>
+
+          {/* Smartphone Frame */}
+          <div className="relative bg-[#F4F5F7] rounded-[44px] p-5 border-4 border-neutral-300 shadow-2xl shadow-neutral-500/20 text-[#121316] min-h-[640px] flex flex-col justify-between overflow-hidden">
+            <div className="w-24 h-4 bg-neutral-900 rounded-full mx-auto mb-3 shadow-inner" />
+
+            {/* SCREEN 1: Home Overview */}
+            {activeScreen === 'home' && (
+              <div className="animate-fadeIn space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <div>
+                    <div className="text-[11px] font-medium text-neutral-500">Saturday, 26 September</div>
+                    <h3 className="text-xl font-black text-[#121316] tracking-tight">Hi, Aarav</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-neutral-200 shadow-sm text-xs font-semibold text-neutral-800">
+                      <TrendingUp className="w-3.5 h-3.5 text-[#121316]" /> Insights
+                    </button>
+                    <div className="w-8 h-8 rounded-full bg-white border border-neutral-200 flex items-center justify-center text-neutral-700 shadow-sm">
+                      <Bell className="w-4 h-4" />
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-[#121316] text-[#CCFF00] font-black text-xs flex items-center justify-center shadow-sm">
+                      A
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative bg-[#121316] text-white rounded-[32px] p-6 shadow-xl shadow-black/25">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-mono uppercase tracking-[0.16em] text-neutral-400 font-semibold">
+                      THIS MONTH, KEPT
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-[#CCFF00] text-black">
+                      +14%
+                    </span>
+                  </div>
+                  <div className="text-4xl font-black tracking-tight text-white mb-1">₹34,818</div>
+                  <div className="text-xs text-neutral-400 font-medium mb-6">₹1,00,000 in · ₹65,182 out</div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <button onClick={() => setActiveAction('record')} className="flex flex-col items-center">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                        activeAction === 'record' ? 'bg-[#CCFF00] text-black scale-105 shadow-md' : 'bg-[#24262B] text-white'
+                      }`}>
+                        <Plus className="w-5 h-5 stroke-[2.5]" />
+                      </div>
+                      <span className="text-[11px] font-semibold text-neutral-300 mt-1.5">Record</span>
+                    </button>
+
+                    <button onClick={() => setActiveAction('scan')} className="flex flex-col items-center">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                        activeAction === 'scan' ? 'bg-[#CCFF00] text-black scale-105 shadow-lg shadow-[#CCFF00]/40' : 'bg-[#24262B] text-white'
+                      }`}>
+                        <Scan className="w-5 h-5 stroke-[2.5]" />
+                      </div>
+                      <span className="text-[11px] font-semibold text-neutral-200 mt-1.5">Scan</span>
+                    </button>
+
+                    <button onClick={() => setActiveAction('move')} className="flex flex-col items-center">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                        activeAction === 'move' ? 'bg-[#CCFF00] text-black scale-105 shadow-md' : 'bg-[#24262B] text-white'
+                      }`}>
+                        <ArrowLeftRight className="w-5 h-5 stroke-[2.5]" />
+                      </div>
+                      <span className="text-[11px] font-semibold text-neutral-300 mt-1.5">Move</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-white border border-neutral-200 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-[#CCFF00] flex items-center justify-center text-black flex-shrink-0">
+                      <Sparkles className="w-4 h-4 fill-black" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-[#121316]">Quiet observation</div>
+                      <div className="text-[11px] text-neutral-500">Late-night orders → regret on 4 of 6 nights</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-neutral-400" />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="bg-white rounded-2xl p-3 border border-neutral-200 shadow-sm">
+                    <span className="text-[9px] font-mono uppercase text-neutral-400">BANK</span>
+                    <div className="text-xs font-bold text-neutral-800">HDFC</div>
+                    <div className="text-sm font-black text-[#121316]">₹2,10,881</div>
+                  </div>
+                  <div className="bg-white rounded-2xl p-3 border border-neutral-200 shadow-sm">
+                    <span className="text-[9px] font-mono uppercase text-neutral-400">CREDIT</span>
+                    <div className="text-xs font-bold text-neutral-800">Axis Card</div>
+                    <div className="text-sm font-black text-rose-600">-₹7,767</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SCREEN 2: Who Owes Whom */}
+            {activeScreen === 'debts' && (
+              <div className="animate-fadeIn space-y-3.5">
+                <div className="flex items-start justify-between px-1">
+                  <div>
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-neutral-400">DEBTS</span>
+                    <h3 className="text-2xl font-black text-[#121316] leading-tight">Who owes<br />whom.</h3>
+                  </div>
+                  <div className="flex items-center bg-white p-1 rounded-full border border-neutral-200 text-[11px] font-semibold">
+                    <span className="px-2.5 py-1 rounded-full bg-[#121316] text-white">Home</span>
+                    <span className="px-2.5 py-1 text-neutral-500">People</span>
+                    <span className="px-2.5 py-1 text-neutral-500">Activity</span>
+                  </div>
+                </div>
+
+                <div className="bg-[#121316] text-white rounded-[28px] p-5 shadow-lg">
+                  <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">OVERALL</span>
+                  <div className="text-3xl font-black tracking-tight text-white mt-1">
+                    You owe <span className="text-[#CCFF00]">₹2,900</span>
+                  </div>
+                  <div className="text-[11px] text-neutral-400 mt-1">1 to receive · 2 to pay</div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-white rounded-2xl p-4 border border-neutral-200/90 shadow-sm">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold">YOU'LL RECEIVE</span>
+                    <div className="text-xl font-black text-emerald-600 mt-1">₹2,300</div>
+                    <div className="text-[10px] text-neutral-500 mt-0.5">1 person</div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-4 border border-neutral-200/90 shadow-sm">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-neutral-400 font-bold">YOU OWE</span>
+                    <div className="text-xl font-black text-rose-600 mt-1">₹5,200</div>
+                    <div className="text-[10px] text-neutral-500 mt-0.5">2 people</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div className="bg-white rounded-2xl p-3 border border-neutral-200/80 shadow-sm flex flex-col items-center text-center">
+                    <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-800 mb-1.5">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <span className="text-[11px] font-bold text-neutral-800">Add Person</span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-3 border border-neutral-200/80 shadow-sm flex flex-col items-center text-center">
+                    <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-800 mb-1.5">
+                      <Plus className="w-4 h-4 stroke-[2.5]" />
+                    </div>
+                    <span className="text-[11px] font-bold text-neutral-800">Add Txn</span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-3 border border-neutral-200/80 shadow-sm flex flex-col items-center text-center">
+                    <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-800 mb-1.5">
+                      <Scale className="w-4 h-4" />
+                    </div>
+                    <span className="text-[11px] font-bold text-neutral-800">Settle</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-black text-[#121316] mb-1.5 px-1">Pending Settlements</div>
+                  <div className="bg-white rounded-2xl p-3 border border-neutral-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full bg-[#121316] text-white font-bold flex items-center justify-center text-xs">
+                        A
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-[#121316]">Aman</div>
+                        <div className="text-[10px] text-neutral-500">17 Aug</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs font-black text-rose-600">-₹2,200</div>
+                      <div className="text-[9px] text-neutral-400">you owe</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SCREEN 3: Total Lent ₹6.85L */}
+            {activeScreen === 'lending' && (
+              <div className="animate-fadeIn space-y-3.5">
+                <div className="bg-[#121316] text-white rounded-[28px] p-5 shadow-lg">
+                  <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-neutral-400">TOTAL LENT</span>
+                  <div className="text-3xl font-black tracking-tight text-white mt-1">₹6,85,000</div>
+                  <div className="my-3 border-t border-neutral-800" />
+                  <div className="grid grid-cols-2 gap-2 text-left mb-3">
+                    <div>
+                      <span className="text-[9px] font-mono uppercase text-neutral-400">OUTSTANDING</span>
+                      <div className="text-sm font-black text-white">₹5,96,701</div>
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-mono uppercase text-neutral-400">INTEREST EARNED</span>
+                      <div className="text-sm font-black text-white">₹26,915</div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-neutral-800 text-neutral-200">Active 2</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#38311B] text-[#E0C068]">Due 6</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#3F1D24] text-[#F87171]">Overdue 4</span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-neutral-800 text-neutral-400">Done 1</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="bg-[#CCFF00] rounded-2xl p-2.5 flex flex-col items-center justify-center text-black font-extrabold shadow-md cursor-pointer">
+                    <Plus className="w-5 h-5 stroke-[2.5]" />
+                    <span className="text-[10px] mt-1">New</span>
+                  </div>
+                  <div className="bg-white rounded-2xl p-2.5 border border-neutral-200 flex flex-col items-center justify-center text-neutral-800 font-bold shadow-sm">
+                    <ArrowUpRight className="w-5 h-5" />
+                    <span className="text-[10px] mt-1">Payment</span>
+                  </div>
+                  <div className="bg-white rounded-2xl p-2.5 border border-neutral-200 flex flex-col items-center justify-center text-neutral-800 font-bold shadow-sm">
+                    <Users className="w-5 h-5" />
+                    <span className="text-[10px] mt-1">People</span>
+                  </div>
+                  <div className="bg-white rounded-2xl p-2.5 border border-neutral-200 flex flex-col items-center justify-center text-neutral-800 font-bold shadow-sm">
+                    <Calculator className="w-5 h-5" />
+                    <span className="text-[10px] mt-1">Calc</span>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-neutral-500 font-bold mb-1.5 px-1">
+                    NEEDS ATTENTION
+                  </div>
+                  <div className="bg-white rounded-2xl border border-neutral-200 divide-y divide-neutral-100 overflow-hidden shadow-sm">
+                    <div className="p-2.5 flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-[#121316]">Ramesh Kumar</span>
+                          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-600">Overdue</span>
+                        </div>
+                        <div className="text-[9px] text-neutral-400">Overdue · 2 Sept</div>
+                      </div>
+                      <div className="text-xs font-black text-rose-600">₹1,44,080</div>
+                    </div>
+                    <div className="p-2.5 flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-[#121316]">Priya Sharma</span>
+                          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-rose-100 text-rose-600">Overdue</span>
+                        </div>
+                        <div className="text-[9px] text-neutral-400">Overdue · 19 Jun</div>
+                      </div>
+                      <div className="text-xs font-black text-rose-600">₹67,057</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Bottom Dock */}
+            <div className="mt-4 pt-3 border-t border-neutral-200 flex items-center justify-around text-neutral-500">
+              <div className="flex flex-col items-center cursor-pointer text-black">
+                <Wallet className="w-4 h-4" />
+                <span className="text-[9px] font-bold mt-0.5">Home</span>
+              </div>
+              <div className="flex flex-col items-center cursor-pointer hover:text-black">
+                <Calendar className="w-4 h-4" />
+                <span className="text-[9px] font-medium mt-0.5">Timeline</span>
+              </div>
+              <div className="w-9 h-9 rounded-full bg-[#121316] text-[#CCFF00] flex items-center justify-center shadow-md">
+                <Plus className="w-5 h-5 stroke-[2.5]" />
+              </div>
+              <div className="flex flex-col items-center cursor-pointer hover:text-black">
+                <Users className="w-4 h-4" />
+                <span className="text-[9px] font-medium mt-0.5">Debts</span>
+              </div>
+              <div className="flex flex-col items-center cursor-pointer hover:text-black">
+                <Lock className="w-4 h-4" />
+                <span className="text-[9px] font-medium mt-0.5">Vault</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const BentoGridFeatures = () => {
+      return (
+        <section id="features" className="py-20 sm:py-28 relative z-10">
+          <div className="text-center max-w-2xl mx-auto mb-16 px-4 reveal-on-scroll">
+            <span className="text-xs font-bold uppercase tracking-widest text-[#121316] bg-[#CCFF00] px-3.5 py-1.5 rounded-full shadow-sm">
+              Intelligent Architecture
+            </span>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-[#121316] mt-4 tracking-tight leading-tight">
+              Who owes whom, solved. <br className="hidden sm:block" />
+              Zero spreadsheet fatigue.
+            </h2>
+            <p className="text-neutral-600 text-sm sm:text-base mt-3">
+              Designed specifically for modern peers who manage day-to-day cash flow, split multi-party expenses, and lend money with calculated returns.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-6xl mx-auto px-4 sm:px-6">
+            
+            {/* Card 1: Lending CRM (Sage asymmetric cutout with audio/wave bars) */}
+            <div className="lg:col-span-7 bg-[#B8C4B4] text-[#121316] rounded-tl-[48px] rounded-tr-[28px] rounded-br-[48px] rounded-bl-[28px] p-7 sm:p-9 shadow-xl relative overflow-hidden flex flex-col justify-between border border-[#A4B3A0] transition-all hover:shadow-2xl hover:scale-[1.01] reveal-on-scroll">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center shadow-md">
+                    <DollarSign className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/10 border border-black/15 text-xs font-mono font-bold uppercase text-[#121316]">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-black" /> Verified Portfolio
+                  </div>
+                </div>
+                <div className="text-xs font-mono font-extrabold uppercase tracking-widest bg-[#121316] text-[#CCFF00] px-3 py-1 rounded-full shadow-sm">
+                  LENDING CRM
+                </div>
+              </div>
+
+              <div className="space-y-2 mb-6">
+                <h3 className="text-3xl sm:text-4xl font-black tracking-tight text-[#121316]">
+                  Smart Lending Portfolio
+                </h3>
+                <p className="text-neutral-800 text-sm leading-relaxed max-w-md font-medium">
+                  Track borrowers, calculate complex compound interest, and monitor installments. Know exactly who owes what, and when.
+                </p>
+              </div>
+
+              <div className="bg-[#121316] text-white rounded-[32px] p-5 shadow-lg border border-black/20 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-neutral-400 uppercase tracking-widest">
+                    PORTFOLIO OVERVIEW
+                  </span>
+                  <span className="w-6 h-6 rounded-full bg-neutral-800 flex items-center justify-center text-[11px] text-neutral-300">
+                    i
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-1 h-12 px-2 py-1 bg-[#1A1C20] rounded-2xl">
+                  {[40, 65, 85, 100, 75, 45, 30, 20, 35, 60, 95, 100, 80, 50, 30, 45, 70, 90, 60, 40].map((h, i) => (
+                    <div
+                      key={i}
+                      style={{ height: `${h}%` }}
+                      className={`w-1 rounded-full transition-all ${
+                        (i >= 2 && i <= 5) || (i >= 10 && i <= 13)
+                          ? 'bg-[#CCFF00]'
+                          : 'bg-neutral-600'
+                      }`}
+                    />
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-neutral-800 items-baseline">
+                  <div>
+                    <div className="text-2xl font-black font-mono text-white">₹6.85L</div>
+                    <div className="text-[10px] text-neutral-400 uppercase font-mono">Total Lent</div>
+                  </div>
+                  <div>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-neutral-800 text-neutral-300 border border-neutral-700">
+                      Completed 1 ✓
+                    </span>
+                    <div className="text-[10px] text-neutral-400 mt-1 font-mono">Priya Sharma</div>
+                  </div>
+                  <div className="text-right">
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-[#3F1D24] text-[#F87171] border border-rose-500/40">
+                      Overdue 4 ⚠
+                    </span>
+                    <div className="text-[10px] text-rose-400 mt-1 font-mono">Ramesh Kumar</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: AI Observations */}
+            <div className="lg:col-span-5 bg-[#121316] text-white rounded-tr-[48px] rounded-tl-[28px] rounded-bl-[48px] rounded-br-[28px] p-7 sm:p-9 shadow-xl relative overflow-hidden flex flex-col justify-between border border-neutral-800 transition-all hover:shadow-2xl hover:scale-[1.01] reveal-on-scroll">
+              <div className="absolute top-0 right-0 w-52 h-52 bg-[#CCFF00]/15 rounded-full blur-3xl pointer-events-none" />
+
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-[#CCFF00] text-black flex items-center justify-center shadow-lg shadow-[#CCFF00]/25">
+                    <Sparkles className="w-6 h-6 fill-black" />
+                  </div>
+                  <span className="text-[10px] font-mono font-bold tracking-widest uppercase bg-[#1D1F24] border border-neutral-700 px-3 py-1 rounded-full text-[#CCFF00]">
+                    AI OBSERVATIONS
+                  </span>
+                </div>
+
+                <h3 className="text-2xl sm:text-3xl font-black text-white mb-2">
+                  Quiet Observations
+                </h3>
+                <p className="text-neutral-400 text-sm leading-relaxed mb-6">
+                  Turn your raw transaction logs into proactive financial advice. CredPilot spots cash leaks and calculates safe lending reserves.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#1A1C20] border border-neutral-700/80 text-left space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#CCFF00] animate-pulse" />
+                  <span className="text-xs font-mono font-bold text-white">CredPilot Intelligence</span>
+                </div>
+                <p className="text-xs text-neutral-300 italic leading-relaxed">
+                  "Late-night food orders correlated with regret on 4 of 6 nights. Curbing this frees up ₹4,200/mo into your lending pool."
+                </p>
+                <div className="pt-1 flex items-center justify-between text-[10px] text-neutral-400 font-mono">
+                  <span>Confidence: 98.4%</span>
+                  <span className="text-[#CCFF00]">Autonomous</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Multi-Payer Splitting */}
+            <div className="lg:col-span-5 bg-white text-[#121316] rounded-bl-[48px] rounded-br-[28px] rounded-tl-[28px] rounded-tr-[48px] p-7 sm:p-9 shadow-xl relative overflow-hidden flex flex-col justify-between border border-neutral-200/90 transition-all hover:shadow-2xl hover:scale-[1.01] reveal-on-scroll">
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="w-12 h-12 rounded-2xl bg-[#121316] text-[#CCFF00] flex items-center justify-center shadow-md">
+                    <Users className="w-6 h-6 stroke-[2.5]" />
+                  </div>
+                  <span className="text-[10px] font-mono font-bold tracking-widest uppercase bg-[#F4F5F7] border border-neutral-300 px-3 py-1 rounded-full text-neutral-700">
+                    TRIP & EXPENSE SPLIT
+                  </span>
+                </div>
+
+                <h3 className="text-2xl sm:text-3xl font-black text-[#121316] mb-2">
+                  Multi-Payer Splitting
+                </h3>
+                <p className="text-neutral-600 text-sm leading-relaxed mb-6">
+                  Perfect for trips, roommates, and concerts. Split evenly or enter custom proportional balances with one-tap UPI settlement.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-[#F4F5F7] border border-neutral-200/80 space-y-2.5">
+                <div className="flex justify-between items-center text-xs font-bold">
+                  <span className="text-neutral-600">Weekend Getaway Trip</span>
+                  <span className="text-[#121316] font-mono">₹14,500 total</span>
+                </div>
+                <div className="flex items-center justify-between pt-1 text-xs">
+                  <span className="font-semibold text-emerald-700">You'll receive: ₹2,300</span>
+                  <span className="font-semibold text-rose-600">You owe: ₹5,200</span>
+                </div>
+                <div className="w-full h-2 bg-neutral-300 rounded-full overflow-hidden flex">
+                  <div className="w-[30%] bg-emerald-500 h-full" />
+                  <div className="w-[70%] bg-rose-500 h-full" />
+                </div>
+              </div>
+            </div>
+
+            {/* Card 4: Zero-Knowledge Vault */}
+            <div className="lg:col-span-7 bg-[#B8C4B4] text-[#121316] rounded-br-[48px] rounded-bl-[28px] rounded-tr-[48px] rounded-tl-[28px] p-7 sm:p-9 shadow-xl relative overflow-hidden flex flex-col justify-between border border-[#A4B3A0] transition-all hover:shadow-2xl hover:scale-[1.01] reveal-on-scroll">
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center shadow-md">
+                      <Lock className="w-5 h-5 stroke-[2.5]" />
+                    </div>
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#121316] bg-black/10 px-3 py-1 rounded-full border border-black/15">
+                      AES-256 Vault
+                    </span>
+                  </div>
+                  <span className="text-xs font-mono font-extrabold uppercase tracking-widest bg-[#121316] text-[#CCFF00] px-3 py-1 rounded-full shadow-sm">
+                    SOVEREIGN PRIVACY
+                  </span>
+                </div>
+
+                <h3 className="text-3xl sm:text-4xl font-black text-[#121316] mb-2 tracking-tight">
+                  Zero-Knowledge Vault
+                </h3>
+                <p className="text-neutral-800 text-sm leading-relaxed max-w-lg font-medium mb-6">
+                  On-device encrypted local storage with FaceID / Biometric auto-lock. Your loans, contacts, and personal wealth statements never leave your hardware.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-2xl bg-[#121316] text-white flex items-center gap-2.5 shadow-sm">
+                  <Fingerprint className="w-4 h-4 text-[#CCFF00]" />
+                  <span className="text-xs font-semibold">FaceID Auto-Lock</span>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-[#121316] text-white flex items-center gap-2.5 shadow-sm">
+                  <ShieldCheck className="w-4 h-4 text-[#CCFF00]" />
+                  <span className="text-xs font-semibold">Zero Telemetry</span>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-[#121316] text-white flex items-center gap-2.5 shadow-sm">
+                  <Smartphone className="w-4 h-4 text-[#CCFF00]" />
+                  <span className="text-xs font-semibold">Offline First</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+      );
+    };
+
+    const LendingDashboardDeepDive = () => {
+      const [loanAmount, setLoanAmount] = useState(685000);
+      const [termMonths, setTermMonths] = useState(12);
+      const [interestRate, setInterestRate] = useState(14);
+      const [interestType, setInterestType] = useState('reducing');
+      const [frequency, setFrequency] = useState('monthly');
+      const [exportNotice, setExportNotice] = useState(false);
+
+      const calculatedValues = useMemo(() => {
+        const P = Number(loanAmount);
+        const annualR = Number(interestRate) / 100;
+        const n = Number(termMonths);
+
+        let monthlyInstallment = 0;
+        let totalInterest = 0;
+        let totalPayment = 0;
+
+        if (interestType === 'fixed') {
+          totalInterest = P * annualR * (n / 12);
+          totalPayment = P + totalInterest;
+          monthlyInstallment = totalPayment / n;
+        } else {
+          const r = annualR / 12;
+          if (r === 0) {
+            monthlyInstallment = P / n;
+            totalPayment = P;
+            totalInterest = 0;
+          } else {
+            monthlyInstallment = (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+            totalPayment = monthlyInstallment * n;
+            totalInterest = totalPayment - P;
+          }
+        }
+
+        const principalPercent = Math.round((P / totalPayment) * 100) || 80;
+        const interestPercent = 100 - principalPercent;
+
+        return {
+          monthlyInstallment: Math.round(monthlyInstallment),
+          totalInterest: Math.round(totalInterest),
+          totalPayment: Math.round(totalPayment),
+          principalPercent,
+          interestPercent,
+        };
+      }, [loanAmount, termMonths, interestRate, interestType]);
+
+      const handleExport = () => {
+        setExportNotice(true);
+        setTimeout(() => setExportNotice(false), 4000);
+      };
+
+      return (
+        <section id="lending" className="py-20 sm:py-28 relative z-10">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="max-w-2xl mb-14 reveal-on-scroll">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#121316] bg-[#CCFF00] px-3.5 py-1.5 rounded-full shadow-sm">
+                Lending, mathematically perfected
+              </span>
+              <h2 className="text-3xl sm:text-5xl font-black text-[#121316] mt-4 tracking-tight">
+                The Smart Loan Engine.
+              </h2>
+              <p className="text-neutral-600 text-sm sm:text-base mt-3">
+                Configure Daily, Monthly, or Yearly terms with transparent Fixed vs. Reducing balance schedules. Auto-calculates your exact interest yields.
+              </p>
+            </div>
+
+            <div className="rounded-[36px] bg-white border border-neutral-200/90 p-6 sm:p-10 shadow-xl shadow-neutral-300/40 reveal-on-scroll">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                <div className="lg:col-span-6 space-y-6">
+                  
+                  <div className="p-4 rounded-2xl bg-[#F4F5F7] border border-neutral-200/80">
+                    <div className="flex justify-between items-baseline mb-2">
+                      <label className="text-xs font-bold text-neutral-600 uppercase tracking-wider">Loan Principal</label>
+                      <span className="text-2xl font-black font-mono text-[#121316]">₹{loanAmount.toLocaleString('en-IN')}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="10000"
+                      max="1000000"
+                      step="5000"
+                      value={loanAmount}
+                      onChange={(e) => setLoanAmount(Number(e.target.value))}
+                      className="w-full h-2.5 bg-neutral-300 rounded-lg appearance-none cursor-pointer accent-[#121316]"
+                    />
+                    <div className="flex justify-between text-[10px] text-neutral-500 font-mono mt-1">
+                      <span>₹10,000</span>
+                      <span>₹5,00,000</span>
+                      <span>₹10,00,000</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 rounded-2xl bg-[#F4F5F7] border border-neutral-200/80">
+                      <div className="flex justify-between items-baseline mb-2">
+                        <label className="text-xs font-bold text-neutral-600 uppercase tracking-wider">Duration</label>
+                        <span className="text-sm font-bold text-[#121316] font-mono">{termMonths} Mo</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="36"
+                        value={termMonths}
+                        onChange={(e) => setTermMonths(Number(e.target.value))}
+                        className="w-full h-2 bg-neutral-300 rounded-lg appearance-none cursor-pointer accent-[#121316]"
+                      />
+                    </div>
+
+                    <div className="p-4 rounded-2xl bg-[#F4F5F7] border border-neutral-200/80">
+                      <div className="flex justify-between items-baseline mb-2">
+                        <label className="text-xs font-bold text-neutral-600 uppercase tracking-wider">Annual Interest</label>
+                        <span className="text-sm font-bold text-[#121316] font-mono">{interestRate}% APY</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="30"
+                        step="0.5"
+                        value={interestRate}
+                        onChange={(e) => setInterestRate(Number(e.target.value))}
+                        className="w-full h-2 bg-neutral-300 rounded-lg appearance-none cursor-pointer accent-[#121316]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider block mb-2">
+                      Calculation Model
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setInterestType('reducing')}
+                        className={`py-3 px-4 rounded-2xl border text-xs font-bold transition-all ${
+                          interestType === 'reducing'
+                            ? 'bg-[#121316] text-[#CCFF00] border-[#121316] shadow-md'
+                            : 'bg-[#F4F5F7] text-neutral-600 border-neutral-200 hover:text-black'
+                        }`}
+                      >
+                        Reducing Balance
+                      </button>
+                      <button
+                        onClick={() => setInterestType('fixed')}
+                        className={`py-3 px-4 rounded-2xl border text-xs font-bold transition-all ${
+                          interestType === 'fixed'
+                            ? 'bg-[#121316] text-[#CCFF00] border-[#121316] shadow-md'
+                            : 'bg-[#F4F5F7] text-neutral-600 border-neutral-200 hover:text-black'
+                        }`}
+                      >
+                        Fixed / Flat Rate
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-neutral-700 uppercase tracking-wider block mb-2">
+                      Compounding Cadence
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['daily', 'monthly', 'yearly'].map((cadence) => (
+                        <button
+                          key={cadence}
+                          onClick={() => setFrequency(cadence)}
+                          className={`py-2.5 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${
+                            frequency === cadence
+                              ? 'border-[#121316] bg-[#121316] text-[#CCFF00]'
+                              : 'border-neutral-200 bg-[#F4F5F7] text-neutral-600 hover:text-neutral-900'
+                          }`}
+                        >
+                          {cadence}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      onClick={handleExport}
+                      className="w-full py-3.5 rounded-2xl bg-[#CCFF00] hover:bg-[#b8e600] text-black font-extrabold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-[#CCFF00]/25 active:scale-95 cursor-pointer"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Generate 1-Click PDF Amortization Statement
+                    </button>
+                    {exportNotice && (
+                      <div className="mt-2 text-xs text-neutral-800 font-semibold flex items-center gap-1.5 p-2 rounded-xl bg-[#CCFF00]/30 border border-[#CCFF00]">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> PDF Statement Generated! Simulated download for loan ID #CP-9831.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-6 flex flex-col justify-between space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-5 rounded-3xl bg-[#121316] text-white shadow-lg">
+                      <div className="text-[11px] font-mono text-neutral-400 uppercase tracking-wider">Monthly Installment</div>
+                      <div className="text-2xl sm:text-3xl font-black font-mono text-white mt-1">
+                        ₹{calculatedValues.monthlyInstallment.toLocaleString('en-IN')}
+                      </div>
+                      <div className="text-[10px] text-neutral-400 mt-1 font-mono">Auto-calculated per {frequency}</div>
+                    </div>
+
+                    <div className="p-5 rounded-3xl bg-[#121316] text-white shadow-lg">
+                      <div className="text-[11px] font-mono text-neutral-400 uppercase tracking-wider">Total Interest Earned</div>
+                      <div className="text-2xl sm:text-3xl font-black font-mono text-[#CCFF00] mt-1">
+                        +₹{calculatedValues.totalInterest.toLocaleString('en-IN')}
+                      </div>
+                      <div className="text-[10px] text-[#CCFF00] font-mono mt-1">Net ROI: +{((calculatedValues.totalInterest / loanAmount) * 100).toFixed(1)}%</div>
+                    </div>
+                  </div>
+
+                  <div className="p-5 rounded-3xl bg-[#F4F5F7] border border-neutral-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-neutral-800">Principal vs. Interest Distribution</span>
+                      <span className="text-xs font-mono font-bold text-neutral-600">Total: ₹{calculatedValues.totalPayment.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    <div className="w-full h-4 bg-neutral-300 rounded-full overflow-hidden flex">
+                      <div
+                        style={{ width: `${calculatedValues.principalPercent}%` }}
+                        className="bg-[#121316] h-full transition-all duration-300"
+                      />
+                      <div
+                        style={{ width: `${calculatedValues.interestPercent}%` }}
+                        className="bg-[#CCFF00] h-full transition-all duration-300"
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs mt-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#121316]" />
+                        <span className="text-neutral-600">Principal: <b className="text-black font-mono">₹{loanAmount.toLocaleString('en-IN')} ({calculatedValues.principalPercent}%)</b></span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#CCFF00]" />
+                        <span className="text-neutral-600">Interest: <b className="text-[#121316] font-mono">₹{calculatedValues.totalInterest.toLocaleString('en-IN')} ({calculatedValues.interestPercent}%)</b></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-5 rounded-3xl bg-[#F4F5F7] border border-neutral-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-neutral-800 flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-black" />
+                        Installment Payment Calendar Preview
+                      </span>
+                      <div className="flex items-center gap-3 text-[10px]">
+                        <span className="flex items-center gap-1 text-black font-bold">
+                          <span className="w-2.5 h-2.5 rounded bg-[#CCFF00] border border-black" /> Paid
+                        </span>
+                        <span className="flex items-center gap-1 text-neutral-500 font-medium">
+                          <span className="w-2.5 h-2.5 rounded bg-neutral-300" /> Upcoming
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-6 sm:grid-cols-12 gap-1.5 pt-1">
+                      {Array.from({ length: 12 }).map((_, idx) => {
+                        const isPaid = idx < 6;
+                        return (
+                          <div
+                            key={idx}
+                            className={`h-11 rounded-xl border flex flex-col items-center justify-center p-1 transition-all ${
+                              isPaid
+                                ? 'bg-[#CCFF00] border-black text-black font-bold'
+                                : 'bg-white border-neutral-300 text-neutral-400'
+                            }`}
+                          >
+                            <span className="text-[9px] font-mono font-bold leading-none">M{idx + 1}</span>
+                            <span className="text-[8px] mt-1 font-mono">{isPaid ? '✓ Paid' : 'Due'}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      );
+    };
+
+    const AppDownloadSection = ({ onOpenModal }) => {
+      const [phoneOrEmail, setPhoneOrEmail] = useState('');
+      const [linkSent, setLinkSent] = useState(false);
+
+      const handleSendLink = (e) => {
+        e.preventDefault();
+        if (phoneOrEmail.trim()) {
+          setLinkSent(true);
+          setTimeout(() => setLinkSent(false), 5000);
+          setPhoneOrEmail('');
+        }
+      };
+
+      return (
+        <section id="download" className="py-20 sm:py-28 relative z-10">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <div className="rounded-[40px] bg-[#121316] text-white p-8 sm:p-14 md:p-16 relative overflow-hidden shadow-2xl reveal-on-scroll">
+              <div className="absolute top-0 right-0 w-96 h-96 bg-[#CCFF00]/15 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+                <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold uppercase tracking-wider bg-[#CCFF00] text-black">
+                    <Download className="w-3.5 h-3.5" /> Mobile App Available
+                  </span>
+
+                  <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
+                    Download CredPilot for iOS and Android.
+                  </h2>
+
+                  <p className="text-neutral-300 text-sm sm:text-base leading-relaxed max-w-xl">
+                    Track personal loans, split group bills with QR codes, and monitor daily liquidity wherever you go with our zero-knowledge biometric mobile app.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
+                    <button
+                      onClick={onOpenModal}
+                      className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-white text-black font-extrabold text-sm flex items-center justify-center gap-3 hover:bg-neutral-100 transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
+                    >
+                      <Apple className="w-5 h-5 fill-black" />
+                      <div className="text-left leading-none">
+                        <div className="text-[10px] text-neutral-500 uppercase font-mono">Download on the</div>
+                        <div className="text-sm font-black">App Store</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={onOpenModal}
+                      className="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-[#1D1F24] border border-neutral-700 text-white font-extrabold text-sm flex items-center justify-center gap-3 hover:bg-neutral-800 transition-all shadow-lg hover:scale-105 active:scale-95 cursor-pointer"
+                    >
+                      <Play className="w-4 h-4 fill-white" />
+                      <div className="text-left leading-none">
+                        <div className="text-[10px] text-neutral-400 uppercase font-mono">Get it on</div>
+                        <div className="text-sm font-black">Google Play</div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="pt-4 max-w-md mx-auto lg:mx-0">
+                    <div className="text-xs text-neutral-400 mb-2 font-medium">Or receive a direct download link via SMS:</div>
+                    <form onSubmit={handleSendLink} className="flex gap-2">
+                      <input
+                        type="tel"
+                        value={phoneOrEmail}
+                        onChange={(e) => setPhoneOrEmail(e.target.value)}
+                        placeholder="+91 98765 43210"
+                        className="bg-[#1D1F24] border border-neutral-700 rounded-xl px-4 py-2.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-[#CCFF00] flex-1 font-mono"
+                        required
+                      />
+                      <button
+                        type="submit"
+                        className="px-5 py-2.5 rounded-xl bg-[#CCFF00] hover:bg-[#b8e600] text-black font-bold text-xs transition-colors whitespace-nowrap cursor-pointer"
+                      >
+                        Send Link
+                      </button>
+                    </form>
+                    {linkSent && (
+                      <div className="text-xs text-[#CCFF00] mt-2 flex items-center gap-1.5 font-semibold">
+                        <CheckCircle2 className="w-4 h-4" /> Link sent! Check your messages.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-center lg:justify-start gap-5 pt-3 text-xs text-neutral-400">
+                    <span className="flex items-center gap-1.5">
+                      <Star className="w-4 h-4 text-[#CCFF00] fill-[#CCFF00]" /> 4.9 Rating (24K+ reviews)
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-[#CCFF00]" /> AES-256 On-Device
+                    </span>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5 flex justify-center">
+                  <div className="bg-white text-[#121316] rounded-3xl p-6 sm:p-8 text-center shadow-2xl max-w-xs w-full border border-neutral-200">
+                    <div className="w-10 h-10 rounded-2xl bg-[#121316] text-[#CCFF00] font-black text-lg flex items-center justify-center mx-auto mb-3">
+                      CP
+                    </div>
+
+                    <div className="text-base font-black text-[#121316]">Scan with your phone</div>
+                    <div className="text-xs text-neutral-500 mt-0.5 mb-4">Point your camera to download CredPilot immediately</div>
+
+                    <div className="p-3 bg-[#F4F5F7] rounded-2xl border border-neutral-200 inline-block mb-4 shadow-inner">
+                      <div className="w-44 h-44 bg-white p-2 rounded-xl border border-neutral-300 flex flex-col items-center justify-center relative">
+                        <QrCode className="w-36 h-36 text-[#121316]" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-lg bg-[#CCFF00] border-2 border-black flex items-center justify-center font-black text-xs text-black shadow-sm">
+                            CP
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] font-mono text-neutral-500">
+                      Compatible with iOS 16+ & Android 10+
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </section>
+      );
+    };
+
+    const DemoModal = ({ isOpen, onClose }) => {
+      if (!isOpen) return null;
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#121316] text-white border border-neutral-800 rounded-[36px] p-6 sm:p-8 max-w-xl w-full relative shadow-2xl">
+            <button
+              onClick={onClose}
+              className="absolute top-5 right-5 text-neutral-400 hover:text-white p-1 cursor-pointer"
+            >
+              ✕
+            </button>
+
+            <div className="flex items-center gap-2 mb-4">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#CCFF00] animate-pulse" />
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#CCFF00]">CredPilot Walkthrough</span>
+            </div>
+
+            <h3 className="text-2xl font-black text-white mb-2">Simplicity meets sovereign control</h3>
+            <p className="text-xs text-neutral-400 mb-6">
+              See how easy it is to issue an interest-bearing personal loan, split weekend trip expenses, and monitor monthly cash reserves.
+            </p>
+
+            <div className="w-full aspect-video rounded-2xl bg-neutral-900 border border-neutral-800 flex flex-col items-center justify-center relative overflow-hidden group">
+              <div className="w-14 h-14 rounded-full bg-[#CCFF00] text-black flex items-center justify-center shadow-lg shadow-[#CCFF00]/30 cursor-pointer group-hover:scale-110 transition-transform">
+                <Play className="w-6 h-6 fill-black ml-1" />
+              </div>
+              <span className="text-xs font-semibold text-neutral-300 mt-3">Watch 60-Second Walkthrough</span>
+            </div>
+
+            <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <a
+                href="#download"
+                onClick={onClose}
+                className="text-xs text-[#CCFF00] font-bold hover:underline"
+              >
+                Jump to App Downloads →
+              </a>
+              <button
+                onClick={onClose}
+                className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-[#CCFF00] text-black font-extrabold text-xs hover:bg-[#b8e600] transition-colors cursor-pointer"
+              >
+                Got it, Let's Try Free
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    function App() {
+      const [demoOpen, setDemoOpen] = useState(false);
+      const [scrolled, setScrolled] = useState(false);
+
+      useScrollAnimation();
+
+      useEffect(() => {
+        const handleScroll = () => setScrolled(window.scrollY > 30);
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+      }, []);
+
+      return (
+        <div className="min-h-screen bg-[#F4F5F7] text-[#121316] font-sans selection:bg-[#CCFF00] selection:text-black overflow-x-hidden relative">
+          <CustomCursor />
+          <DemoModal isOpen={demoOpen} onClose={() => setDemoOpen(false)} />
+
+          {/* Navigation Bar */}
+          <header
+            className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 px-4 sm:px-6 ${
+              scrolled
+                ? 'bg-[#F4F5F7]/90 backdrop-blur-md border-b border-neutral-300/80 py-3 shadow-sm'
+                : 'bg-transparent py-5'
+            }`}
+          >
+            <div className="max-w-6xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-2.5 cursor-pointer">
+                <div className="w-8 h-8 rounded-xl bg-[#121316] flex items-center justify-center text-[#CCFF00] font-black text-base shadow-sm">
+                  CP
+                </div>
+                <span className="text-xl font-black tracking-tight text-[#121316] font-sans">
+                  CredPilot<span className="text-[#CCFF00] font-black">.</span>
+                </span>
+              </div>
+
+              <nav className="hidden md:flex items-center gap-8 text-xs font-bold uppercase tracking-wider text-neutral-600">
+                <a href="#features" className="hover:text-black transition-colors">Features</a>
+                <a href="#screens" className="hover:text-black transition-colors">App Screens</a>
+                <a href="#lending" className="hover:text-black transition-colors">Lending CRM</a>
+                <a href="#download" className="hover:text-black transition-colors">Download</a>
+              </nav>
+
+              <div className="flex items-center gap-3">
+                <a
+                  href="#download"
+                  className="px-5 py-2.5 rounded-full bg-[#121316] hover:bg-black text-[#CCFF00] font-extrabold text-xs uppercase tracking-wider transition-all duration-200 shadow-md hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                >
+                  Get App <ArrowRight className="w-3.5 h-3.5 text-[#CCFF00]" />
+                </a>
+              </div>
+            </div>
+          </header>
+
+          {/* Hero Section */}
+          <main className="relative pt-32 sm:pt-40 pb-16 px-4 sm:px-6 max-w-6xl mx-auto z-10">
+            <section className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center mb-24">
+              <div className="lg:col-span-6 space-y-6 text-center lg:text-left reveal-on-scroll">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-neutral-300 shadow-sm">
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#CCFF00] opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#CCFF00]" />
+                  </span>
+                  <span className="text-xs font-mono font-bold text-neutral-700">
+                    CredPilot v2.6 Live: Who Owes Whom & Smart Loan CRM
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-neutral-400" />
+                </div>
+
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#121316] leading-[1.08]">
+                  Master Your Wealth.{' '}
+                  <span className="underline decoration-[#CCFF00] decoration-wavy decoration-2">
+                    Simplify Your Lending.
+                  </span>
+                </h1>
+
+                <p className="text-neutral-600 text-base sm:text-lg max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
+                  The all-in-one personal finance app that tracks your daily cash flow, splits group expenses, and manages your lending portfolio with smart calculators and AI insights.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
+                  <a
+                    href="#download"
+                    className="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-[#121316] text-[#CCFF00] font-extrabold text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-black transition-all shadow-xl hover:scale-105 active:scale-95 cursor-pointer"
+                  >
+                    Try CredPilot Free <ArrowRight className="w-4 h-4 text-[#CCFF00]" />
+                  </a>
+
+                  <button
+                    onClick={() => setDemoOpen(true)}
+                    className="w-full sm:w-auto px-6 py-3.5 rounded-2xl border border-neutral-300 bg-white text-[#121316] font-bold text-sm flex items-center justify-center gap-2.5 transition-all hover:bg-neutral-100 shadow-sm cursor-pointer"
+                  >
+                    <Play className="w-4 h-4 text-black fill-black" /> See How It Works
+                  </button>
+                </div>
+
+                <div className="pt-6 flex flex-wrap items-center justify-center lg:justify-start gap-6 border-t border-neutral-200 text-neutral-600 text-xs font-bold">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-black" />
+                    <span>Zero Spreadsheet Fatigue</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-black" />
+                    <span>On-Device Biometric Vault</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-black" />
+                    <span>Quiet AI Observations</span>
+                  </div>
+                </div>
+              </div>
+
+              <div id="screens" className="lg:col-span-6 flex justify-center reveal-on-scroll">
+                <InteractiveAppShowcase />
+              </div>
+            </section>
+
+            {/* Bento Grid */}
+            <BentoGridFeatures />
+
+            {/* Deep Dive Calculator */}
+            <LendingDashboardDeepDive />
+
+            {/* Social Proof */}
+            <section className="py-20 border-y border-neutral-200 relative z-10 reveal-on-scroll">
+              <div className="max-w-6xl mx-auto px-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 text-center mb-16">
+                  <div className="p-5 rounded-3xl bg-white border border-neutral-200 shadow-sm">
+                    <div className="text-3xl sm:text-4xl font-black text-[#121316] font-mono">₹18.4 Cr+</div>
+                    <div className="text-xs text-neutral-500 mt-1 uppercase tracking-wider font-bold">Loan Volume Tracked</div>
+                  </div>
+                  <div className="p-5 rounded-3xl bg-white border border-neutral-200 shadow-sm">
+                    <div className="text-3xl sm:text-4xl font-black text-[#121316] font-mono">99.4%</div>
+                    <div className="text-xs text-neutral-500 mt-1 uppercase tracking-wider font-bold">On-Time Repayment</div>
+                  </div>
+                  <div className="p-5 rounded-3xl bg-white border border-neutral-200 shadow-sm">
+                    <div className="text-3xl sm:text-4xl font-black text-[#121316] font-mono">120K+</div>
+                    <div className="text-xs text-neutral-500 mt-1 uppercase tracking-wider font-bold">Active Group Splitters</div>
+                  </div>
+                  <div className="p-5 rounded-3xl bg-white border border-neutral-200 shadow-sm">
+                    <div className="text-3xl sm:text-4xl font-black text-rose-600 font-mono">0.00%</div>
+                    <div className="text-xs text-neutral-500 mt-1 uppercase tracking-wider font-bold">Data Trackers or Ads</div>
+                  </div>
+                </div>
+
+                <div className="max-w-3xl mx-auto p-8 sm:p-10 rounded-[36px] bg-[#121316] text-white shadow-2xl text-center relative">
+                  <div className="flex justify-center gap-1 text-[#CCFF00] mb-4">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="w-5 h-5 fill-[#CCFF00]" />
+                    ))}
+                  </div>
+                  <p className="text-base sm:text-lg text-neutral-200 italic font-light leading-relaxed mb-6">
+                    "Before CredPilot, keeping track of who owed what after trips and managing private loans in WhatsApp was pure chaos. The automated installment reminders and reducing-balance calculations saved my sanity and earned me over ₹26,000 in interest this year alone."
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-[#CCFF00] text-black font-black flex items-center justify-center text-xs">
+                      SK
+                    </div>
+                    <div className="text-left">
+                      <div className="text-xs font-bold text-white">Soren Kjeldsen</div>
+                      <div className="text-[10px] text-neutral-400">Angel Investor & Multi-Unit Landlord</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Mobile Download Section */}
+            <AppDownloadSection onOpenModal={() => setDemoOpen(true)} />
+
+            {/* Bottom Call to Action */}
+            <section className="my-20 relative rounded-[40px] overflow-hidden p-8 sm:p-14 text-center bg-[#121316] text-white shadow-2xl reveal-on-scroll">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-[#CCFF00]/15 via-transparent to-transparent pointer-events-none" />
+              
+              <div className="relative z-10 max-w-2xl mx-auto space-y-6">
+                <span className="text-xs font-mono font-bold uppercase tracking-widest text-[#121316] bg-[#CCFF00] px-4 py-1.5 rounded-full shadow-sm">
+                  Start Free • No Credit Card Required
+                </span>
+
+                <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
+                  Take control of your cash flow today.
+                </h2>
+
+                <p className="text-neutral-300 text-sm sm:text-base leading-relaxed">
+                  Join thousands of private lenders, travelers, and disciplined budgeters who manage their wealth with sovereign clarity.
+                </p>
+
+                <div className="pt-2 flex justify-center">
+                  <a
+                    href="#download"
+                    className="px-8 py-4 rounded-2xl bg-[#CCFF00] hover:bg-[#b8e600] text-black font-black text-sm uppercase tracking-wider flex items-center gap-2 transition-all shadow-xl shadow-[#CCFF00]/25 hover:scale-105 active:scale-95 cursor-pointer"
+                  >
+                    Start Tracking Now <ArrowRight className="w-4 h-4" />
+                  </a>
+                </div>
+              </div>
+            </section>
+          </main>
+
+          {/* Footer */}
+          <footer className="border-t border-neutral-200 bg-white pt-16 pb-12 px-4 sm:px-6 relative z-10">
+            <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-10 mb-12">
+              <div className="md:col-span-5 space-y-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#121316] flex items-center justify-center text-[#CCFF00] font-black text-sm">
+                    CP
+                  </div>
+                  <span className="text-xl font-black tracking-tight text-[#121316] font-sans">
+                    CredPilot<span className="text-[#CCFF00]">.</span>
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-600 leading-relaxed max-w-sm">
+                  The modern personal finance, peer-to-peer lending CRM, and multi-payer group expense splitting platform. Built for sovereign financial discipline.
+                </p>
+                <div className="pt-2">
+                  <a 
+                    href="https://lovable.dev/projects/4331d2df-9606-4363-a1d7-0783b22046a9?utm_source=lovable-badge&utm_campaign=badge-wording-disabled"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#F4F5F7] border border-neutral-300 text-xs font-semibold text-neutral-700 hover:border-black transition-all"
+                  >
+                    <span>Built with Lovable UI aesthetic</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-black" />
+                  </a>
+                </div>
+              </div>
+
+              <div className="md:col-span-2 space-y-3">
+                <div className="text-xs font-bold text-neutral-900 uppercase tracking-wider font-mono">Platform</div>
+                <ul className="space-y-2 text-xs text-neutral-600">
+                  <li><a href="#features" className="hover:text-black transition-colors">Features</a></li>
+                  <li><a href="#screens" className="hover:text-black transition-colors">App Screens</a></li>
+                  <li><a href="#lending" className="hover:text-black transition-colors">Lending Engine</a></li>
+                  <li><a href="#download" className="hover:text-black transition-colors">Download App</a></li>
+                </ul>
+              </div>
+
+              <div className="md:col-span-2 space-y-3">
+                <div className="text-xs font-bold text-neutral-900 uppercase tracking-wider font-mono">Trust & Security</div>
+                <ul className="space-y-2 text-xs text-neutral-600">
+                  <li><span className="text-neutral-600">Zero Knowledge</span></li>
+                  <li><span className="text-neutral-600">Biometric Lock</span></li>
+                  <li><span className="text-neutral-600">Local Data Storage</span></li>
+                  <li><span className="text-neutral-600">PDF Export</span></li>
+                </ul>
+              </div>
+
+              <div className="md:col-span-3 space-y-3">
+                <div className="text-xs font-bold text-neutral-900 uppercase tracking-wider font-mono">Stay Connected</div>
+                <p className="text-xs text-neutral-600">
+                  Get updates on lending regulation, compound interest formulas, and product releases.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    placeholder="name@domain.com"
+                    className="bg-[#F4F5F7] border border-neutral-300 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-black flex-1 font-mono"
+                  />
+                  <button
+                    onClick={() => setDemoOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-[#121316] hover:bg-black text-[#CCFF00] font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Join
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="max-w-6xl mx-auto pt-8 border-t border-neutral-200 flex flex-col sm:flex-row justify-between items-center text-[11px] text-neutral-500 gap-4">
+              <div>
+                © 2026 CredPilot Technologies Inc. All rights reserved.
+              </div>
+              <div className="flex gap-6">
+                <span className="hover:text-neutral-900 cursor-pointer transition-colors">Privacy Policy</span>
+                <span className="hover:text-neutral-900 cursor-pointer transition-colors">Terms of Service</span>
+                <span className="hover:text-neutral-900 cursor-pointer transition-colors">Security Disclosures</span>
+              </div>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
