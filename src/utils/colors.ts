@@ -100,4 +100,6 @@ export const colors = {
     // Aliases for compatibility
     primery: "#CDFA27",
     secondary: "#141414",
+    bgGray: "#EFEFEF",
+    lightRed: "#CF463015",
 }

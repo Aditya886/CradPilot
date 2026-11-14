@@ -9,6 +9,7 @@ import CustomInput from '../components/CustomInput';
 import Cross from '../../assets/images/icons/cross.svg';
 import { insert, getWhere } from '../../storage/local/sqlite';
 import Toast from 'react-native-toast-message';
+import { subscriptionService } from '../../services/subscriptionService';
 import { syncNotifications } from '../../services/localNotificationService';
 
 interface AddDebtPersonModalProps {
@@ -66,6 +67,12 @@ export default function AddDebtPersonModal({
 
     const handleSave = () => {
         if (isButtonDisabled) return;
+
+        const check = subscriptionService.canAddEntry();
+        if (!check.allowed) {
+            close();
+            return;
+        }
 
         try {
             // Check if phone number already exists

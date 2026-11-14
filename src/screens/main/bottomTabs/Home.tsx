@@ -14,8 +14,24 @@ import FinanceIcon from '../../../assets/images/icons/finance.svg'
 import { navigate } from '../../../navigation/NavigationUtils'
 import { calculateExpectedInterest } from '../../../utils/FormatUtil'
 import { useAppSelector } from '../../../utils/hooks'
+import Debts from './Debts'
+import TutionSection from '../subScreens/tution/TutionSection'
 
-export default function Home() {
+export default function Home(props: any) {
+    const purpose = useAppSelector(state => state.app.purpose) || 'local';
+
+    if (purpose === 'local') {
+        return <Debts {...props} isHomeScreen={true} />;
+    }
+
+    if (purpose === 'tution') {
+        return <TutionSection {...props} isHomeScreen={true} />;
+    }
+
+    return <FinanceHome {...props} />;
+}
+
+function FinanceHome(props: any) {
     const currentUser = useAppSelector(state => state.app.currentUser);
     const capitalize = (str: string) => str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
     const [totals, setTotals] = useState({

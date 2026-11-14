@@ -27,7 +27,7 @@ import ExportImportModal from '../../../ui/modals/ExportImportModal'
 import { ExportColumn } from '../../../services/exportService'
 import { importService } from '../../../services/importService'
 
-export default function Debts({ route, navigation }: any) {
+export default function Debts({ route, navigation, isHomeScreen }: any) {
     const [selected, setSelected] = useState("Home")
     const [selectedActivity, setSelectedActivity] = useState(ActivityList[0])
     const [selectedPersonFilter, setSelectedPersonFilter] = useState(PersonList[0])
@@ -204,7 +204,11 @@ Priya Sharma,+91 98112 33455,2000,incoming,2026-10-19,UPI,Advance return`;
 
     return (
         <CommonBg>
-            <DebtsHeader selected={selected} setSelected={setSelected} />
+            <DebtsHeader
+                selected={selected}
+                setSelected={setSelected}
+                showBack={!isHomeScreen && !!navigation?.canGoBack?.()}
+            />
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: resAvarage(3), paddingBottom: resAvarage(1) }}>
                 <ExportImportButton onPress={() => setShowExportModal(true)} label="Debts Export / Import" />
             </View>

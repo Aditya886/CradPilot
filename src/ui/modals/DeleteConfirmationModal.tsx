@@ -2,10 +2,11 @@ import { View, Modal, StyleSheet, Animated, TouchableWithoutFeedback, ViewStyle,
 import React, { useEffect, useRef } from 'react';
 import { colors } from '../../utils/colors';
 import { FontBold, FontMedium, FontRegular, FontSemiBold } from '../../utils/fontFamily';
-import { font14, font16, font18 } from '../../utils/fontSizes';
+import { font11, font13, font14, font16, font18 } from '../../utils/fontSizes';
 import { resHeight, resAvarage, resWidth, scaleSize } from '../../utils/responsive';
 import CustomText from '../components/CustomText';
 import Cross from '../../assets/images/icons/cross.svg';
+import { subscriptionService } from '../../services/subscriptionService';
 
 interface DeleteConfirmationModalProps {
     show: boolean;
@@ -57,7 +58,13 @@ export default function DeleteConfirmationModal({
         }).start(() => setShow(false));
     };
 
+    const isPremium = subscriptionService.isPremium();
+
     const handleConfirm = () => {
+        if (!subscriptionService.canDelete()) {
+            close();
+            return;
+        }
         onConfirm();
         close();
     };
@@ -89,12 +96,30 @@ export default function DeleteConfirmationModal({
                                 {description}
                             </CustomText>
 
+                            {!isPremium && (
+                                <View style={styles.lockedBanner}>
+                                    <CustomText style={styles.lockedTitle}>🔒 Deletion Locked on Free Tier</CustomText>
+                                    <CustomText style={styles.lockedSubtitle}>
+                                        Deleting entries across all sections is reserved for CredPilot Pro members.
+                                    </CustomText>
+                                </View>
+                            )}
+
                             <View style={styles.footer}>
                                 <TouchableOpacity onPress={close} activeOpacity={0.8} style={styles.cancelBtn}>
                                     <CustomText style={styles.cancelBtnText}>Cancel</CustomText>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={handleConfirm} activeOpacity={0.8} style={styles.deleteBtn}>
-                                    <CustomText style={styles.deleteBtnText}>{confirmText}</CustomText>
+                                <TouchableOpacity
+                                    onPress={handleConfirm}
+                                    activeOpacity={0.8}
+                                    style={[
+                                        styles.deleteBtn,
+                                        !isPremium && { backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FCA5A5' },
+                                    ]}
+                                >
+                                    <CustomText style={[styles.deleteBtnText, !isPremium && { color: '#DC2626' }]}>
+                                        {!isPremium ? '🔒 Upgrade to Delete' : confirmText}
+                                    </CustomText>
                                 </TouchableOpacity>
                             </View>
                         </Animated.View>
@@ -140,6 +165,25 @@ const styles = StyleSheet.create({
         fontSize: font14,
         color: colors.black70,
         lineHeight: font14 * 1.5,
+    },
+    lockedBanner: {
+        backgroundColor: '#FEF2F2',
+        borderRadius: scaleSize(8),
+        padding: resAvarage(2),
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        gap: resAvarage(0.5),
+    },
+    lockedTitle: {
+        fontFamily: FontBold,
+        fontSize: font13,
+        color: '#DC2626',
+    },
+    lockedSubtitle: {
+        fontFamily: FontRegular,
+        fontSize: font11,
+        color: '#7F1D1D',
+        lineHeight: font11 * 1.4,
     },
     footer: {
         flexDirection: 'row',

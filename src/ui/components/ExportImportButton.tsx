@@ -5,6 +5,7 @@ import { colors } from '../../utils/colors';
 import { FontBold } from '../../utils/fontFamily';
 import { font11, font12, font18 } from '../../utils/fontSizes';
 import { resAvarage } from '../../utils/responsive';
+import { subscriptionService } from '../../services/subscriptionService';
 
 interface ExportImportButtonProps {
     onPress: () => void;
@@ -17,10 +18,17 @@ export default function ExportImportButton({
     label = 'Export / Import',
     variant = 'pill',
 }: ExportImportButtonProps) {
+    const handlePress = () => {
+        if (!subscriptionService.canUseExportImport()) {
+            return;
+        }
+        onPress();
+    };
+
     return (
         <TouchableOpacity
             activeOpacity={0.8}
-            onPress={onPress}
+            onPress={handlePress}
             style={[
                 styles.btn,
                 variant === 'outline' ? styles.btnOutline : styles.btnPill,

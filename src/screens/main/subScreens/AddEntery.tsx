@@ -9,6 +9,7 @@ import { colors } from '../../../utils/colors'
 import { goBack } from '../../../navigation/NavigationUtils'
 import { insert, getWhere } from '../../../storage/local/sqlite'
 import Toast from 'react-native-toast-message'
+import { subscriptionService } from '../../../services/subscriptionService'
 import { font16 } from '../../../utils/fontSizes'
 import { FontSemiBold } from '../../../utils/fontFamily'
 
@@ -25,6 +26,11 @@ export default function AddEntery() {
                 text2: 'Please fill name and phone number.',
             })
             return
+        }
+
+        const check = subscriptionService.canAddEntry();
+        if (!check.allowed) {
+            return;
         }
 
         try {

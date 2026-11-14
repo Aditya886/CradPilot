@@ -16,6 +16,7 @@ import { PieChart } from 'react-native-gifted-charts'
 import { insert, getWhere } from '../../../storage/local/sqlite'
 import CalendarModal from '../../../ui/modals/CalendarModal'
 import { syncNotifications } from '../../../services/localNotificationService'
+import { subscriptionService } from '../../../services/subscriptionService'
 
 // Svg components
 import Svg, { Rect, Path } from 'react-native-svg';
@@ -169,6 +170,11 @@ export default function NewLoan({ route }: any) {
 
     const handleCreateLoan = () => {
         if (!name.trim() || !phone.trim() || !amount.trim()) {
+            return;
+        }
+
+        const check = subscriptionService.canAddEntry();
+        if (!check.allowed) {
             return;
         }
 

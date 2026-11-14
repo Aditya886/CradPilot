@@ -9,6 +9,9 @@ import Terms from "./images/icons/terms.svg"
 import Policy from "./images/icons/policy.svg"
 import About from "./images/icons/about.svg"
 import Tution from "./images/icons/tution.svg"
+import DebIcon from "./images/icons/debts.svg"
+import Stars from "./images/icons/stars.svg"
+import FinanceIcon from "./images/icons/finance.svg"
 
 export const ACCOUNT_TYPES = [
     {
@@ -76,34 +79,55 @@ export const ActivityList = [
 
 export const MoreFeatureList = [
     {
-        id: 1,
-        title: "Savings & Goals",
-        subtitle: "Track your saving and goals",
-        icon: Bills
+        id: 'subscription',
+        title: "Subscription",
+        subtitle: "CredPilot Pro · Storage & Features",
+        icon: Stars,
     },
     {
-        id: 2,
-        title: "Home Banking",
-        subtitle: "Manage accounts and recent activities",
-        icon: BankIcon
+        id: 'debts',
+        title: "Debts Ledger",
+        subtitle: "Who owes whom · Personal debts",
+        icon: DebIcon,
+        purposeType: 'local',
     },
     {
-        id: 3,
-        title: "EMI & Loans",
-        subtitle: "All you emi and loans",
-        icon: Loan
+        id: 'tution',
+        title: "Tuition Center",
+        subtitle: "Students, Fees & Batches",
+        icon: Tution,
+        purposeType: 'tution',
     },
     {
-        id: 4,
+        id: 'finance',
+        title: "Finance & Loans",
+        subtitle: "Borrowers, loans & interest overview",
+        icon: FinanceIcon,
+        purposeType: 'finance',
+    },
+    {
+        id: 'plans',
         title: "Plans & Trips",
         subtitle: "Track all your plans and trips",
-        icon: Budget
+        icon: Budget,
     },
     {
-        id: 5,
-        title: "Tution",
-        subtitle: "Students, Fees & Payments",
-        icon: Tution
+        id: 'savings',
+        title: "Savings & Goals",
+        subtitle: "Track your saving and goals",
+        icon: Bills,
+    },
+    {
+        id: 'home_banking',
+        title: "Home Banking",
+        subtitle: "Manage accounts and recent activities",
+        icon: BankIcon,
+    },
+    {
+        id: 'emi',
+        title: "EMI & Loans",
+        subtitle: "All your emi and loans",
+        icon: Loan,
     },
 ]
 export const aboutList = [

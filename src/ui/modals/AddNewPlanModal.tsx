@@ -15,6 +15,7 @@ import { colors } from '../../utils/colors';
 import { FontBold, FontMedium, FontRegular } from '../../utils/fontFamily';
 import { font11, font12, font13, font14, font15, font18 } from '../../utils/fontSizes';
 import { resAvarage, resHeight, resWidth } from '../../utils/responsive';
+import { subscriptionService } from '../../services/subscriptionService';
 
 const CloseIcon = ({ color = colors.black, size = resAvarage(3.5) }: { color?: string; size?: number }) => (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -128,6 +129,12 @@ export default function AddNewPlanModal({
     const handleCreate = () => {
         const parsedBudget = parseFloat(budget);
         if (!title.trim() || isNaN(parsedBudget) || parsedBudget <= 0) {
+            return;
+        }
+
+        const check = subscriptionService.canAddEntry();
+        if (!check.allowed) {
+            close();
             return;
         }
 

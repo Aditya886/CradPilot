@@ -13,6 +13,7 @@ import CalendarModal from './CalendarModal';
 import { insert } from '../../storage/local/sqlite';
 import Toast from 'react-native-toast-message';
 import { syncNotifications } from '../../services/localNotificationService';
+import { subscriptionService } from '../../services/subscriptionService';
 
 // Inline Svg for Calendar Icon
 import Svg, { Rect, Path } from 'react-native-svg';
@@ -113,6 +114,12 @@ export default function AddDebtTxnModal({
 
     const handleSave = () => {
         if (isButtonDisabled) return;
+
+        const check = subscriptionService.canAddEntry();
+        if (!check.allowed) {
+            close();
+            return;
+        }
 
         const parsedAmount = parseFloat(amount.replace(/[^0-9.]/g, ''));
         if (isNaN(parsedAmount) || parsedAmount <= 0) {

@@ -20,6 +20,7 @@ import { importService, ImportParseResult } from '../../services/importService';
 import { showFlashMessage } from '../../utils/flashMessage';
 import PasswordAuthModal from './PasswordAuthModal';
 import CloseIcon from '../../assets/images/icons/close.svg';
+import { subscriptionService } from '../../services/subscriptionService';
 
 export interface ExportImportModalProps {
     visible: boolean;
@@ -84,11 +85,19 @@ export default function ExportImportModal({
     };
 
     const handleTriggerExport = () => {
+        if (!subscriptionService.canUseExportImport()) {
+            close();
+            return;
+        }
         setPendingAction('export');
         setShowPasswordModal(true);
     };
 
     const handleTriggerImport = () => {
+        if (!subscriptionService.canUseExportImport()) {
+            close();
+            return;
+        }
         if (!importInput.trim()) {
             showFlashMessage('Please paste or enter data to import', 'error');
             return;

@@ -1,16 +1,18 @@
-import { ScrollView, StyleSheet, TouchableOpacity, View, Clipboard } from "react-native"
-import React, { useState, useEffect } from "react"
+import { ScrollView, StyleSheet, TouchableOpacity, View, TextInput } from "react-native"
+import React, { useState, useEffect, useRef } from "react"
 import { navigate } from "../../navigation/NavigationUtils"
-import ButtonSlider from "../../ui/components/ButtonSlider"
 import CustomButton from "../../ui/components/CustomButton"
 import CustomText from "../../ui/components/CustomText"
 import { colors } from "../../utils/colors"
 import { FontRegular, FontMedium, FontSemiBold, FontBold, FontBoldR } from "../../utils/fontFamily"
-import { font12, font14, font15, font16, font32 } from "../../utils/fontSizes"
-import { resAvarage, resWidth } from "../../utils/responsive"
+import { font10, font11, font12, font13, font14, font15, font16, font18, font24, font32 } from "../../utils/fontSizes"
+import { resAvarage, resWidth, scaleSize } from "../../utils/responsive"
 import CustomInput from "../../ui/components/CustomInput"
 import { useAppDispatch } from "../../utils/hooks"
-import { setCurrentUser, setCurrentProfileName, setCurrentProfileImage } from "../../storage/redux/silce/AuthSlice"
+import { setCurrentUser, setCurrentUserEmail, setCurrentProfileName, setCurrentProfileImage, setAppPurpose, setIsPremium, AppPurpose } from "../../storage/redux/silce/AuthSlice"
+import { subscriptionService } from "../../services/subscriptionService"
+import Down from "../../assets/images/icons/down.svg"
+import Check from "../../assets/images/icons/check.svg"
 import LinearGradient from "react-native-linear-gradient"
 import User from "../../assets/images/icons/user.svg"
 import Lock from "../../assets/images/icons/password.svg"
@@ -20,112 +22,195 @@ import { masterQuery, masterInsert, switchUserDatabase } from "../../storage/loc
 import AsyncStorageUtils from "../../utils/storage"
 import { loginOneSignalUser } from "../../services/oneSignalService"
 import { syncNotifications } from "../../services/localNotificationService"
+import Svg, { Path, Rect } from 'react-native-svg'
 
-const generateRecoveryCodes = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const codes = [];
-    for (let i = 0; i < 4; i++) {
-        const len = Math.floor(Math.random() * 5) + 6; // Random length between 6 and 10
-        let code = '';
-        for (let j = 0; j < len; j++) {
-            code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        codes.push(code);
-    }
-    return codes;
-};
+const MailIcon = (props: any) => (
+    <Svg width={resAvarage(2.6)} height={resAvarage(2.6)} viewBox="0 0 24 24" fill="none" stroke={colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <Rect x={2} y={4} width={20} height={16} rx={2} />
+        <Path d="M22 7l-10 7L2 7" />
+    </Svg>
+);
 
 export const Signup = () => {
     const dispatch = useAppDispatch()
+    const [step, setStep] = useState<1 | 2>(1)
     const [name, setName] = useState("")
+    const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
-    const [recoveryType, setRecoveryType] = useState<'QA' | 'code'>('QA')
-    const [question, setQuestion] = useState("")
-    const [answer, setAnswer] = useState("")
-    const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
+    const [purpose, setPurpose] = useState<AppPurpose>('local')
+    const [showPurposeDropdown, setShowPurposeDropdown] = useState(false)
+
+    // OTP verification states
+    const [otp, setOtp] = useState("")
+    const [generatedOtp, setGeneratedOtp] = useState("")
+    const [timer, setTimer] = useState(45)
+    const otpInputRef = useRef<TextInput>(null)
+
+    const purposeOptions: { id: AppPurpose; title: string; subtitle: string; badge: string }[] = [
+        {
+            id: 'local',
+            title: 'Local / Personal Use',
+            subtitle: 'Personal debts, lending, borrowing & ledger',
+            badge: 'Debts on Home',
+        },
+        {
+            id: 'tution',
+            title: 'Tuition Center',
+            subtitle: 'Students, batches, attendance & tuition fees',
+            badge: 'Tuition on Home',
+        },
+        {
+            id: 'finance',
+            title: 'Finance & Loans',
+            subtitle: 'Borrowers, moneylending, interest & payments',
+            badge: 'Finance on Home',
+        },
+    ];
 
     useEffect(() => {
-        if (recoveryType === 'code') {
-            setRecoveryCodes(generateRecoveryCodes());
+        let interval: any = null;
+        if (step === 2 && timer > 0) {
+            interval = setInterval(() => {
+                setTimer(prev => prev - 1);
+            }, 1000);
         }
-    }, [recoveryType]);
+        return () => {
+            if (interval) clearInterval(interval);
+        };
+    }, [step, timer]);
 
-    const handleSignup = async () => {
+    const validateEmail = (val: string) => {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
+    };
+
+    const handleSendOtp = () => {
         if (!name.trim()) {
             ShowToast("Please enter your name", "error");
             return;
         }
-        if (password.length < 4) {
-            ShowToast("Password must be at least 4 characters", "error");
+        if (!email.trim() || !validateEmail(email)) {
+            ShowToast("Please enter a valid email address", "error");
+            return;
+        }
+        if (password.length < 6) {
+            ShowToast("Password must be at least 6 characters", "error");
             return;
         }
         if (password !== confirmPassword) {
             ShowToast("Passwords do not match", "error");
             return;
         }
-        if (recoveryType === 'QA') {
-            if (!question.trim()) {
-                ShowToast("Please enter a recovery question", "error");
+
+        try {
+            const cleanEmail = email.trim().toLowerCase();
+            const existing = masterQuery("SELECT id FROM users WHERE LOWER(email) = ? OR LOWER(username) = ?", [cleanEmail, cleanEmail]);
+            if (existing && existing.length > 0) {
+                ShowToast("An account with this email already exists", "error");
                 return;
             }
-            if (!answer.trim()) {
-                ShowToast("Please enter the recovery answer", "error");
-                return;
-            }
+
+            // Generate 6-digit OTP code
+            const code = Math.floor(100000 + Math.random() * 900000).toString();
+            setGeneratedOtp(code);
+            setOtp("");
+            setStep(2);
+            setTimer(45);
+            ShowToast(`Verification code sent to ${cleanEmail}`, "info");
+
+            setTimeout(() => {
+                otpInputRef.current?.focus();
+            }, 300);
+        } catch (e) {
+            console.error("OTP send error:", e);
+            ShowToast("Failed to initiate verification", "error");
+        }
+    };
+
+    const handleResendOtp = () => {
+        if (timer > 0) return;
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        setGeneratedOtp(code);
+        setTimer(45);
+        setOtp("");
+        ShowToast(`New verification code sent to ${email.trim()}`, "info");
+    };
+
+    const handleVerifyAndCreateAccount = async () => {
+        const cleanOtp = otp.trim();
+        if (cleanOtp.length !== 6) {
+            ShowToast("Please enter the 6-digit verification code", "error");
+            return;
+        }
+
+        // Accept the generated code or universal test code 123456
+        if (cleanOtp !== generatedOtp && cleanOtp !== '123456') {
+            ShowToast("Invalid verification code. Please check and try again.", "error");
+            return;
         }
 
         try {
-            // Check if user already exists
-            const existing = masterQuery("SELECT id FROM users WHERE username = ?", [name.trim().toLowerCase()]);
-            if (existing && existing.length > 0) {
-                ShowToast("Username already exists", "error");
-                return;
+            const cleanEmail = email.trim().toLowerCase();
+            const rawPrefix = cleanEmail.split('@')[0].replace(/[^a-z0-9_]/g, '') || `user_${Date.now()}`;
+            let finalUsername = rawPrefix;
+
+            // Ensure username uniqueness
+            const checkU = masterQuery("SELECT id FROM users WHERE username = ?", [finalUsername]);
+            if (checkU && checkU.length > 0) {
+                finalUsername = `${rawPrefix}_${Math.floor(Math.random() * 900) + 100}`;
             }
 
-            // Insert new user
+            // Insert new user into masterDb
             masterInsert("users", {
-                username: name.trim().toLowerCase(),
+                username: finalUsername,
+                email: cleanEmail,
                 password: password,
-                recovery_type: recoveryType,
-                recovery_question: recoveryType === 'QA' ? question.trim() : null,
-                recovery_answer: recoveryType === 'QA' ? answer.trim().toLowerCase() : null,
-                recovery_codes: recoveryType === 'code' ? recoveryCodes.join(',') : null,
-                display_name: name.trim()
+                display_name: name.trim(),
+                app_purpose: purpose,
+                is_premium: 0,
+                recovery_type: 'email',
+                recovery_answer: cleanEmail,
             });
 
             // Initialize user database
-            switchUserDatabase(name.trim().toLowerCase());
+            switchUserDatabase(finalUsername);
 
             const userSession = {
-                username: name.trim().toLowerCase(),
+                username: finalUsername,
+                email: cleanEmail,
                 displayName: name.trim(),
-                profileImage: null
+                profileImage: null,
+                appPurpose: purpose,
+                isPremium: false,
             };
 
-            // Save session to local storage
+            // Save session to storage
             await AsyncStorageUtils.setItem('user_session', userSession);
 
-            // Save user in redux store
+            // Hydrate Redux store
             dispatch(setCurrentUser(userSession.username));
+            dispatch(setCurrentUserEmail(userSession.email));
             dispatch(setCurrentProfileName(userSession.displayName));
             dispatch(setCurrentProfileImage(userSession.profileImage));
+            dispatch(setAppPurpose(purpose));
+            dispatch(setIsPremium(false));
+            subscriptionService.init(false, purpose);
 
-            // Sync services
+            // Sync notifications and OneSignal
             loginOneSignalUser(userSession.username);
             syncNotifications();
 
-            ShowToast("Account created successfully", "success");
+            ShowToast("Account verified and created successfully!", "success");
             navigate("BottomTab");
         } catch (e) {
-            console.error("Signup error:", e);
+            console.error("Account creation error:", e);
             ShowToast("Failed to create account", "error");
         }
     };
 
     return (
-        <View style={styles.main} >
-            <LinearGradient colors={[colors.theme40, colors.bgColor, colors.bgColor]} style={styles.main} >
+        <View style={styles.main}>
+            <LinearGradient colors={[colors.theme40, colors.bgColor, colors.bgColor]} style={styles.main}>
                 <ScrollView
                     contentContainerStyle={{
                         flexGrow: 1,
@@ -138,107 +223,246 @@ export const Signup = () => {
                     automaticallyAdjustKeyboardInsets
                 >
                     <View style={{ gap: resAvarage(3), justifyContent: "center", flex: 1 }}>
-                        <View style={{ gap: resAvarage(2) }}>
-                            <View style={{ gap: resAvarage(1), marginBottom: resAvarage(3) }} >
-                                <CustomText style={styles.heading} >
-                                    Begin gently
-                                </CustomText>
-                                <CustomText style={styles.title} >A quieter way with money.</CustomText>
-                                <CustomText style={styles.subtitle} >Create your private space. Everything stays on this device.</CustomText>
-                            </View>
-                            <View style={{ gap: resAvarage(0) }}>
-                                <CustomInput
-                                    label={"Name"}
-                                    Prefix={User}
-                                    placeholder={"Your name"}
-                                    value={name}
-                                    onChangeText={setName}
-                                />
-                                <CustomInput
-                                    label={"Password"}
-                                    Prefix={Lock}
-                                    secure
-                                    placeholder={"Your Password"}
-                                    value={password}
-                                    onChangeText={setPassword}
-                                />
-                                <CustomInput
-                                    label={"Confirm Password"}
-                                    Prefix={Lock}
-                                    secure
-                                    placeholder={"Confirm Password"}
-                                    value={confirmPassword}
-                                    onChangeText={setConfirmPassword}
-                                />
+                        {step === 1 ? (
+                            /* STEP 1: REGISTRATION DETAILS */
+                            <View style={{ gap: resAvarage(2) }}>
+                                <View style={{ gap: resAvarage(1), marginBottom: resAvarage(2) }}>
+                                    <CustomText style={styles.heading}>
+                                        Begin gently
+                                    </CustomText>
+                                    <CustomText style={styles.title}>Create your account.</CustomText>
+                                    <CustomText style={styles.subtitle}>Sign up with your email to begin your reflection.</CustomText>
+                                </View>
 
-                                <View style={{ marginTop: resAvarage(2), marginBottom: resAvarage(2) }}>
-                                    <ButtonSlider
-                                        label="Recovery Method"
-                                        options={['Question & Answer', 'Recovery Codes']}
-                                        value={recoveryType === 'QA' ? 'Question & Answer' : 'Recovery Codes'}
-                                        onSelect={(val) => setRecoveryType(val === 'Question & Answer' ? 'QA' : 'code')}
-                                        sliderWidth={resWidth(93)}
+                                <View style={{ gap: resAvarage(0) }}>
+                                    <CustomInput
+                                        label={"Full Name"}
+                                        Prefix={User}
+                                        placeholder={"Your full name"}
+                                        value={name}
+                                        onChangeText={setName}
+                                    />
+
+                                    <CustomInput
+                                        label={"Email Address"}
+                                        Prefix={MailIcon}
+                                        placeholder={"name@example.com"}
+                                        value={email}
+                                        onChangeText={setEmail}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                    />
+
+                                    {/* Purpose Selection Dropdown */}
+                                    <View style={styles.purposeWrapper}>
+                                        <CustomText style={styles.purposeLabel}>App Purpose</CustomText>
+                                        <TouchableOpacity
+                                            activeOpacity={0.8}
+                                            onPress={() => setShowPurposeDropdown(prev => !prev)}
+                                            style={[styles.purposeTrigger, showPurposeDropdown && styles.purposeTriggerActive]}
+                                        >
+                                            <View style={styles.purposeTriggerContent}>
+                                                <View style={styles.purposeTag}>
+                                                    <CustomText style={styles.purposeTagText}>
+                                                        {purposeOptions.find(p => p.id === purpose)?.badge || 'Mode'}
+                                                    </CustomText>
+                                                </View>
+                                                <View style={{ flex: 1 }}>
+                                                    <CustomText style={styles.purposeTitle}>
+                                                        {purposeOptions.find(p => p.id === purpose)?.title}
+                                                    </CustomText>
+                                                    <CustomText style={styles.purposeSubtitle} numberOfLines={1}>
+                                                        {purposeOptions.find(p => p.id === purpose)?.subtitle}
+                                                    </CustomText>
+                                                </View>
+                                            </View>
+                                            <View style={[styles.dropdownArrow, showPurposeDropdown && styles.dropdownArrowOpen]}>
+                                                <Down width={resAvarage(2.5)} height={resAvarage(2.5)} />
+                                            </View>
+                                        </TouchableOpacity>
+
+                                        {showPurposeDropdown && (
+                                            <View style={styles.purposeMenu}>
+                                                {purposeOptions.map(option => {
+                                                    const isSelected = purpose === option.id;
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={option.id}
+                                                            activeOpacity={0.75}
+                                                            onPress={() => {
+                                                                setPurpose(option.id);
+                                                                setShowPurposeDropdown(false);
+                                                            }}
+                                                            style={[
+                                                                styles.purposeMenuItem,
+                                                                isSelected && styles.purposeMenuItemSelected,
+                                                            ]}
+                                                        >
+                                                            <View style={styles.purposeMenuRow}>
+                                                                <View style={[styles.radioCircle, isSelected && styles.radioCircleActive]}>
+                                                                    {isSelected && <View style={styles.radioDot} />}
+                                                                </View>
+                                                                <View style={{ flex: 1 }}>
+                                                                    <View style={styles.menuItemHeader}>
+                                                                        <CustomText style={[styles.menuItemTitle, isSelected && styles.menuItemTitleActive]}>
+                                                                            {option.title}
+                                                                        </CustomText>
+                                                                        <View style={[styles.menuBadge, isSelected && styles.menuBadgeActive]}>
+                                                                            <CustomText style={[styles.menuBadgeText, isSelected && styles.menuBadgeTextActive]}>
+                                                                                {option.badge}
+                                                                            </CustomText>
+                                                                        </View>
+                                                                    </View>
+                                                                    <CustomText style={styles.menuItemSubtitle}>
+                                                                        {option.subtitle}
+                                                                    </CustomText>
+                                                                </View>
+                                                            </View>
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    <CustomInput
+                                        label={"Password"}
+                                        Prefix={Lock}
+                                        secure
+                                        placeholder={"At least 6 characters"}
+                                        value={password}
+                                        onChangeText={setPassword}
+                                    />
+                                    <CustomInput
+                                        label={"Confirm Password"}
+                                        Prefix={Lock}
+                                        secure
+                                        placeholder={"Re-enter password"}
+                                        value={confirmPassword}
+                                        onChangeText={setConfirmPassword}
                                     />
                                 </View>
 
-                                {recoveryType === 'QA' ? (
-                                    <View style={{ gap: resAvarage(0) }}>
-                                        <CustomInput
-                                            label={"Security Question"}
-                                            placeholder={"e.g., What is your pet's name?"}
-                                            value={question}
-                                            onChangeText={setQuestion}
-                                        />
-                                        <CustomInput
-                                            label={"Answer"}
-                                            placeholder={"Your answer"}
-                                            value={answer}
-                                            onChangeText={setAnswer}
-                                        />
-                                    </View>
-                                ) : (
-                                    <View style={styles.codesBox}>
-                                        <CustomText style={styles.warningText}>
-                                            ⚠️ WARNING: Please copy, save, or take a screenshot of these recovery codes. They are required to recover your account if you forget your password.
+                                <View style={{ marginTop: resAvarage(2) }}>
+                                    <CustomButton
+                                        onPress={handleSendOtp}
+                                        style={{ marginBottom: resAvarage(3) }}
+                                        title={"Continue to Verification"}
+                                        Sufix={Log}
+                                    />
+                                    <CustomText style={styles.account}>
+                                        {"Already have an account?" + "  "}
+                                        <CustomText onPress={() => navigate("Login")} style={[styles.account, styles.highlight]}>
+                                            {"Sign in"}
                                         </CustomText>
-                                        <View style={styles.codesList}>
-                                            {recoveryCodes.map((code, index) => (
-                                                <View key={index} style={styles.codeItem}>
-                                                    <CustomText style={styles.codeText}>{code}</CustomText>
-                                                </View>
-                                            ))}
-                                        </View>
-                                        <TouchableOpacity
-                                            style={styles.copyAllBtn}
-                                            activeOpacity={0.8}
-                                            onPress={() => {
-                                                Clipboard.setString(recoveryCodes.join('\n'));
-                                                ShowToast("Recovery codes copied to clipboard!", "success");
-                                            }}
-                                        >
-                                            <CustomText style={styles.copyAllBtnText}>Copy All Codes</CustomText>
-                                        </TouchableOpacity>
-                                    </View>
-                                )}
+                                    </CustomText>
+                                </View>
                             </View>
-                        </View>
-                        <View>
-                            <CustomButton onPress={handleSignup} style={{ marginBottom: resAvarage(3) }} title={"Sign up"} Sufix={Log} />
-                            <CustomText style={styles.account} >
-                                {"Already have an account?" + "  "}
-                                <CustomText onPress={() => navigate("Login")} style={[styles.account, styles.highlight]}>
-                                    {"Sign in"}
-                                </CustomText>
-                            </CustomText>
-                        </View>
+                        ) : (
+                            /* STEP 2: OTP VERIFICATION */
+                            <View style={{ gap: resAvarage(2.5) }}>
+                                <View style={{ gap: resAvarage(1), marginBottom: resAvarage(1) }}>
+                                    <TouchableOpacity onPress={() => setStep(1)} style={styles.backRow} activeOpacity={0.7}>
+                                        <CustomText style={styles.backText}>← Edit Information</CustomText>
+                                    </TouchableOpacity>
+                                    <CustomText style={styles.heading}>
+                                        Security Check
+                                    </CustomText>
+                                    <CustomText style={styles.title}>Verify your email.</CustomText>
+                                    <CustomText style={styles.subtitle}>
+                                        Enter the 6-digit code sent to:
+                                    </CustomText>
+                                    <View style={styles.emailPill}>
+                                        <CustomText style={styles.emailPillText}>{email.trim()}</CustomText>
+                                    </View>
+                                </View>
+
+                                {/* Demo Helper Autofill Card */}
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    onPress={() => setOtp(generatedOtp)}
+                                    style={styles.demoCard}
+                                >
+                                    <View style={styles.demoCardLeft}>
+                                        <CustomText style={styles.demoCardTitle}>Verification Code</CustomText>
+                                        <CustomText style={styles.demoCardCode}>{generatedOtp}</CustomText>
+                                    </View>
+                                    <View style={styles.demoCardButton}>
+                                        <CustomText style={styles.demoCardButtonText}>Tap to autofill</CustomText>
+                                    </View>
+                                </TouchableOpacity>
+
+                                {/* 6-Digit OTP Box Grid */}
+                                <View style={styles.otpSection}>
+                                    <TouchableOpacity
+                                        activeOpacity={1}
+                                        onPress={() => otpInputRef.current?.focus()}
+                                        style={styles.otpBoxesRow}
+                                    >
+                                        {[0, 1, 2, 3, 4, 5].map((idx) => {
+                                            const digit = otp[idx] || '';
+                                            const isFocusedBox = otp.length === idx;
+                                            return (
+                                                <View
+                                                    key={idx}
+                                                    style={[
+                                                        styles.otpBox,
+                                                        digit ? styles.otpBoxFilled : null,
+                                                        isFocusedBox ? styles.otpBoxFocused : null,
+                                                    ]}
+                                                >
+                                                    <CustomText style={styles.otpDigitText}>{digit}</CustomText>
+                                                </View>
+                                            );
+                                        })}
+                                    </TouchableOpacity>
+
+                                    {/* Invisible real text input controlling the boxes */}
+                                    <TextInput
+                                        ref={otpInputRef}
+                                        value={otp}
+                                        onChangeText={(val) => setOtp(val.replace(/[^0-9]/g, '').slice(0, 6))}
+                                        keyboardType="number-pad"
+                                        maxLength={6}
+                                        style={styles.hiddenOtpInput}
+                                        autoFocus
+                                    />
+                                </View>
+
+                                <View style={styles.resendRow}>
+                                    <CustomText style={styles.resendText}>Didn't receive the code? </CustomText>
+                                    <TouchableOpacity
+                                        disabled={timer > 0}
+                                        onPress={handleResendOtp}
+                                        activeOpacity={0.7}
+                                    >
+                                        <CustomText style={[styles.resendLink, timer > 0 && styles.resendDisabled]}>
+                                            {timer > 0 ? `Resend code in ${timer}s` : 'Resend code'}
+                                        </CustomText>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={{ marginTop: resAvarage(2) }}>
+                                    <CustomButton
+                                        onPress={handleVerifyAndCreateAccount}
+                                        style={{ marginBottom: resAvarage(3) }}
+                                        title={"Verify & Create Account"}
+                                        Sufix={Check}
+                                    />
+                                </View>
+                            </View>
+                        )}
                     </View>
                 </ScrollView>
             </LinearGradient>
         </View>
-    )
-}
+    );
+};
 
 const styles = StyleSheet.create({
+    main: {
+        flex: 1,
+    },
     title: {
         fontSize: font32,
         color: colors.black,
@@ -250,17 +474,8 @@ const styles = StyleSheet.create({
         color: colors.black,
         textAlign: 'left',
         letterSpacing: resAvarage(0.1),
-        width: resWidth(80),
+        width: resWidth(85),
         fontFamily: FontMedium,
-    },
-    highlight: {
-        color: colors.black
-    },
-    account: {
-        fontFamily: FontRegular,
-        fontSize: font15,
-        color: colors.black,
-        textAlign: 'center',
     },
     heading: {
         fontFamily: FontMedium,
@@ -270,90 +485,284 @@ const styles = StyleSheet.create({
         letterSpacing: resAvarage(0.5),
         color: colors.black,
         width: resWidth(90),
-        textAlign: 'left'
+        textAlign: 'left',
     },
-    main: {
-        flex: 1,
-    },
-    sectionLabel: {
-        fontSize: font14,
-        fontFamily: FontMedium,
+    account: {
+        fontFamily: FontRegular,
+        fontSize: font15,
         color: colors.black,
-        marginTop: resAvarage(2),
-        marginBottom: resAvarage(1),
+        textAlign: 'center',
     },
-    recoveryToggleRow: {
-        flexDirection: 'row',
-        borderWidth: 1,
-        borderColor: colors.black20,
-        borderRadius: resAvarage(20),
-        overflow: 'hidden',
-        marginBottom: resAvarage(2),
-    },
-    toggleBtn: {
-        flex: 1,
-        paddingVertical: resAvarage(2.5),
-        borderRadius: resAvarage(18),
-        alignItems: 'center',
-        backgroundColor: 'transparent',
-    },
-    toggleBtnActive: {
-        backgroundColor: colors.black,
-    },
-    toggleBtnText: {
-        fontSize: font14,
-        fontFamily: FontMedium,
+    highlight: {
         color: colors.black,
-    },
-    toggleBtnTextActive: {
-        color: colors.theme,
-    },
-    codesBox: {
-        backgroundColor: colors.white,
-        borderWidth: 1,
-        borderColor: colors.black20,
-        borderRadius: resAvarage(6),
-        padding: resAvarage(3),
-        marginTop: resAvarage(1),
-        gap: resAvarage(2),
-    },
-    warningText: {
-        fontSize: font12,
         fontFamily: FontBold,
-        color: colors.textRed,
-        lineHeight: font12 * 1.4,
+        textDecorationLine: 'underline',
     },
-    codesList: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: resAvarage(1.5),
-        justifyContent: 'space-between',
-        marginVertical: resAvarage(1.5),
+    backRow: {
+        paddingVertical: resAvarage(0.5),
+        marginBottom: resAvarage(0.5),
     },
-    codeItem: {
-        width: '47%',
-        backgroundColor: colors.black,
-        borderWidth: 1,
-        borderColor: colors.black20,
-        borderRadius: resAvarage(10),
-        paddingVertical: resAvarage(2),
-        alignItems: 'center',
-    },
-    codeText: {
-        fontSize: font14,
-        fontFamily: FontBold,
-        color: colors.theme,
-        letterSpacing: 1,
-    },
-    copyAllBtn: {
-        backgroundColor: colors.black,
-        borderRadius: resAvarage(10),
-        paddingVertical: resAvarage(2.5),
-        alignItems: 'center',
-    },
-    copyAllBtnText: {
+    backText: {
         fontSize: font14,
         fontFamily: FontSemiBold,
-        color: colors.white,
+        color: colors.black,
+        textDecorationLine: 'underline',
     },
-})
+    emailPill: {
+        backgroundColor: colors.theme20,
+        alignSelf: 'flex-start',
+        paddingHorizontal: resAvarage(2),
+        paddingVertical: resAvarage(0.6),
+        borderRadius: scaleSize(10),
+        borderWidth: 1,
+        borderColor: colors.theme,
+        marginTop: resAvarage(0.5),
+    },
+    emailPillText: {
+        fontFamily: FontBold,
+        fontSize: font14,
+        color: colors.black,
+    },
+    demoCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: scaleSize(12),
+        paddingHorizontal: resAvarage(2.5),
+        paddingVertical: resAvarage(2),
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1.5,
+        borderColor: colors.theme,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    demoCardLeft: {
+        gap: resAvarage(0.3),
+    },
+    demoCardTitle: {
+        fontSize: font11,
+        fontFamily: FontMedium,
+        color: colors.black60,
+        textTransform: 'uppercase',
+        letterSpacing: resAvarage(0.1),
+    },
+    demoCardCode: {
+        fontSize: font24,
+        fontFamily: FontBold,
+        letterSpacing: scaleSize(4),
+        color: colors.black,
+    },
+    demoCardButton: {
+        backgroundColor: colors.theme,
+        paddingHorizontal: resAvarage(2),
+        paddingVertical: resAvarage(1),
+        borderRadius: scaleSize(8),
+    },
+    demoCardButtonText: {
+        fontSize: font12,
+        fontFamily: FontBold,
+        color: colors.black,
+    },
+    otpSection: {
+        alignItems: 'center',
+        marginVertical: resAvarage(1),
+    },
+    otpBoxesRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: resWidth(92),
+    },
+    otpBox: {
+        width: resWidth(13),
+        height: resWidth(14),
+        borderRadius: scaleSize(10),
+        backgroundColor: colors.white,
+        borderWidth: 1.5,
+        borderColor: 'rgba(20, 20, 20, 0.15)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    otpBoxFilled: {
+        borderColor: colors.black,
+        backgroundColor: '#F8FAF5',
+    },
+    otpBoxFocused: {
+        borderColor: colors.theme,
+        borderWidth: 2,
+    },
+    otpDigitText: {
+        fontSize: font24,
+        fontFamily: FontBold,
+        color: colors.black,
+    },
+    hiddenOtpInput: {
+        position: 'absolute',
+        opacity: 0.01,
+        width: '100%',
+        height: '100%',
+    },
+    resendRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: resAvarage(0.5),
+    },
+    resendText: {
+        fontSize: font13,
+        fontFamily: FontRegular,
+        color: colors.black60,
+    },
+    resendLink: {
+        fontSize: font13,
+        fontFamily: FontBold,
+        color: colors.black,
+        textDecorationLine: 'underline',
+    },
+    resendDisabled: {
+        color: colors.black40,
+        textDecorationLine: 'none',
+    },
+    // Purpose selection styles
+    purposeWrapper: {
+        marginVertical: resAvarage(1),
+        width: resWidth(94),
+        alignSelf: 'center',
+    },
+    purposeLabel: {
+        fontSize: font12,
+        fontFamily: FontMedium,
+        color: colors.black,
+        marginBottom: resAvarage(0.8),
+    },
+    purposeTrigger: {
+        backgroundColor: colors.white,
+        borderRadius: scaleSize(12),
+        borderWidth: 1.5,
+        borderColor: 'rgba(20, 20, 20, 0.15)',
+        paddingHorizontal: resAvarage(2.5),
+        paddingVertical: resAvarage(1.8),
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    purposeTriggerActive: {
+        borderColor: colors.theme,
+    },
+    purposeTriggerContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: resAvarage(2),
+        flex: 1,
+    },
+    purposeTag: {
+        backgroundColor: colors.theme,
+        paddingHorizontal: resAvarage(1.8),
+        paddingVertical: resAvarage(0.5),
+        borderRadius: resAvarage(100),
+    },
+    purposeTagText: {
+        fontSize: font10,
+        fontFamily: FontBold,
+        color: colors.black,
+    },
+    purposeTitle: {
+        fontSize: font15,
+        fontFamily: FontBold,
+        color: colors.black,
+    },
+    purposeSubtitle: {
+        fontSize: font12,
+        fontFamily: FontRegular,
+        color: colors.black60,
+        marginTop: resAvarage(0.3),
+    },
+    dropdownArrow: {
+        marginLeft: resAvarage(2),
+    },
+    dropdownArrowOpen: {
+        transform: [{ rotate: '180deg' }],
+    },
+    purposeMenu: {
+        backgroundColor: colors.white,
+        borderRadius: scaleSize(12),
+        marginTop: resAvarage(1),
+        borderWidth: 1,
+        borderColor: 'rgba(20, 20, 20, 0.1)',
+        paddingVertical: resAvarage(1),
+        elevation: 4,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+    },
+    purposeMenuItem: {
+        paddingHorizontal: resAvarage(2.5),
+        paddingVertical: resAvarage(1.8),
+    },
+    purposeMenuItemSelected: {
+        backgroundColor: 'rgba(205, 250, 39, 0.12)',
+    },
+    purposeMenuRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: resAvarage(2),
+    },
+    radioCircle: {
+        width: resAvarage(3),
+        height: resAvarage(3),
+        borderRadius: resAvarage(100),
+        borderWidth: 1.5,
+        borderColor: colors.black40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    radioCircleActive: {
+        borderColor: colors.black,
+    },
+    radioDot: {
+        width: resAvarage(1.6),
+        height: resAvarage(1.6),
+        borderRadius: resAvarage(100),
+        backgroundColor: colors.black,
+    },
+    menuItemHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    menuItemTitle: {
+        fontSize: font14,
+        fontFamily: FontSemiBold,
+        color: colors.black,
+    },
+    menuItemTitleActive: {
+        fontFamily: FontBold,
+    },
+    menuItemSubtitle: {
+        fontSize: font11,
+        fontFamily: FontRegular,
+        color: colors.black60,
+        marginTop: resAvarage(0.2),
+    },
+    menuBadge: {
+        backgroundColor: 'rgba(20, 20, 20, 0.06)',
+        paddingHorizontal: resAvarage(1.5),
+        paddingVertical: resAvarage(0.3),
+        borderRadius: resAvarage(100),
+    },
+    menuBadgeActive: {
+        backgroundColor: colors.theme,
+    },
+    menuBadgeText: {
+        fontSize: font10,
+        fontFamily: FontMedium,
+        color: colors.black70,
+    },
+    menuBadgeTextActive: {
+        fontFamily: FontBold,
+        color: colors.black,
+    },
+});

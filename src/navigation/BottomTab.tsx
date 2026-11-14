@@ -267,7 +267,6 @@ export default function BottomTab() {
             }}
             tabBar={renderCustomTabBar}>
             <Tab.Screen name="Home" component={Home} />
-            <Tab.Screen name="Debts" component={Debts} />
             <Tab.Screen name="More" component={More} />
         </Tab.Navigator>
     );

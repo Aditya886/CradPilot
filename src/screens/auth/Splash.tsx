@@ -5,7 +5,8 @@ import { resAvarage, resHeight, resWidth } from "../../utils/responsive"
 import { useEffect, useRef } from "react"
 import { navigate, resetAndNavigate } from "../../navigation/NavigationUtils"
 import { useAppDispatch } from "../../utils/hooks"
-import { setHasLaunched, setCurrentUser, setCurrentProfileName, setCurrentProfileImage } from "../../storage/redux/silce/AuthSlice"
+import { setHasLaunched, setCurrentUser, setCurrentUserEmail, setCurrentProfileName, setCurrentProfileImage, setAppPurpose, setIsPremium } from "../../storage/redux/silce/AuthSlice"
+import { subscriptionService } from "../../services/subscriptionService"
 import LinearGradient from "react-native-linear-gradient"
 import { colors } from "../../utils/colors"
 import { BlurView } from '@sbaiahmed1/react-native-blur';
@@ -48,8 +49,12 @@ export const Splash = () => {
 
                     // Hydrate Redux state
                     dispatch(setCurrentUser(session.username));
+                    if (session.email) dispatch(setCurrentUserEmail(session.email));
                     dispatch(setCurrentProfileName(session.displayName || session.username));
                     dispatch(setCurrentProfileImage(session.profileImage || null));
+                    dispatch(setAppPurpose(session.appPurpose || 'local'));
+                    dispatch(setIsPremium(Boolean(session.isPremium)));
+                    subscriptionService.init(Boolean(session.isPremium), session.appPurpose || 'local');
 
                     // OneSignal and local notifications sync
                     loginOneSignalUser(session.username);

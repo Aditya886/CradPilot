@@ -26,6 +26,7 @@ import Attendance from "../screens/main/subScreens/tution/Attendance";
 import Batch from "../screens/main/subScreens/tution/Batch";
 import AddStudent from "../screens/main/subScreens/tution/AddStudent";
 import WebViewScreen from "../screens/main/subScreens/WebViewScreen";
+import Debts from "../screens/main/bottomTabs/Debts";
 
 const Stack = createNativeStackNavigator<any>();
 
@@ -124,6 +125,11 @@ export const StackNavigation = () => {
             <Stack.Screen
                 name="TripDetails"
                 component={TripDetails}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="Debts"
+                component={Debts}
                 options={{ headerShown: false }}
             />
             <Stack.Screen

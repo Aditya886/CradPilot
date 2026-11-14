@@ -13,6 +13,8 @@ import { resAvarage, resWidth } from '../../../utils/responsive';
 import LogoutIcon from '../../../assets/images/icons/logout.svg';
 import ExportImportModal from '../../../ui/modals/ExportImportModal';
 import LogoutModal from '../../../ui/modals/LogoutModal';
+import SubscriptionModal from '../../../ui/modals/SubscriptionModal';
+import { subscriptionService } from '../../../services/subscriptionService';
 import { fullBackupService } from '../../../services/fullBackupService';
 import { importService } from '../../../services/importService';
 import Next from '../../../assets/images/icons/next.svg';
@@ -32,6 +34,19 @@ export default function More() {
     const [flattenedRows, setFlattenedRows] = useState<any[]>([]);
     const [summaryData, setSummaryData] = useState<any>({});
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [subscriptionModalOptions, setSubscriptionModalOptions] = useState<{
+        visible: boolean;
+        title?: string;
+        subtitle?: string;
+        reason?: any;
+    }>({ visible: false });
+
+    useEffect(() => {
+        const unsub = subscriptionService.subscribe((opts) => {
+            setSubscriptionModalOptions(opts);
+        });
+        return () => unsub();
+    }, []);
 
     const handleLogout = async () => {
         try {
@@ -70,12 +85,14 @@ export default function More() {
     }, [showBackupModal]);
 
     const handleOpenExport = async () => {
+        if (!subscriptionService.canUseExportImport()) return;
         await loadBackupData();
         setBackupInitialMode('export');
         setShowBackupModal(true);
     };
 
     const handleOpenImport = async () => {
+        if (!subscriptionService.canUseExportImport()) return;
         await loadBackupData();
         setBackupInitialMode('import');
         setShowBackupModal(true);
@@ -99,7 +116,11 @@ export default function More() {
                 style={{ marginTop: resAvarage(2) }}
                 contentContainerStyle={{ paddingBottom: resAvarage(3), marginTop: resAvarage(1) }}
             >
-                <MoreList title={'More Features'} data={MoreFeatureList} />
+                <MoreList
+                    title={'More Features'}
+                    data={MoreFeatureList}
+                    onSubscriptionPress={() => subscriptionService.showUpgradeModal({ reason: 'manage' })}
+                />
 
                 {/* DATA BACKUP & TRANSFER SECTION */}
                 <View style={styles.sectionContainer}>
@@ -183,6 +204,14 @@ export default function More() {
                     await loadBackupData();
                     return res;
                 }}
+            />
+            {/* Subscription & Pro Upgrade Modal */}
+            <SubscriptionModal
+                visible={subscriptionModalOptions.visible}
+                onClose={() => setSubscriptionModalOptions(prev => ({ ...prev, visible: false }))}
+                title={subscriptionModalOptions.title}
+                subtitle={subscriptionModalOptions.subtitle}
+                reason={subscriptionModalOptions.reason}
             />
         </CommonBg>
     );

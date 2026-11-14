@@ -10,9 +10,9 @@ import { font12, font14, font15, font32 } from "../../utils/fontSizes"
 import { resAvarage, resWidth } from "../../utils/responsive"
 import CustomInput from "../../ui/components/CustomInput"
 import { useAppDispatch } from "../../utils/hooks"
-import { setCurrentUser, setCurrentProfileName, setCurrentProfileImage } from "../../storage/redux/silce/AuthSlice"
+import { setCurrentUser, setCurrentUserEmail, setCurrentProfileName, setCurrentProfileImage, setAppPurpose, setIsPremium } from "../../storage/redux/silce/AuthSlice"
+import { subscriptionService } from "../../services/subscriptionService"
 import LinearGradient from "react-native-linear-gradient"
-import User from "../../assets/images/icons/user.svg"
 import Lock from "../../assets/images/icons/password.svg"
 import Log from "../../assets/images/icons/login.svg"
 import { ShowToast } from "../../utils/CustomToast/ToastManager"
@@ -20,23 +20,31 @@ import { masterQuery, switchUserDatabase } from "../../storage/local/sqlite"
 import AsyncStorageUtils from "../../utils/storage"
 import { loginOneSignalUser } from "../../services/oneSignalService"
 import { syncNotifications } from "../../services/localNotificationService"
+import Svg, { Path, Rect } from 'react-native-svg'
+
+const MailIcon = (props: any) => (
+    <Svg width={resAvarage(2.6)} height={resAvarage(2.6)} viewBox="0 0 24 24" fill="none" stroke={colors.black} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <Rect x={2} y={4} width={20} height={16} rx={2} />
+        <Path d="M22 7l-10 7L2 7" />
+    </Svg>
+);
 
 export const Login = () => {
     const dispatch = useAppDispatch()
     const route = useRoute<any>()
     const { flow } = route.params || {}
-    const [name, setName] = useState("")
+    const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
 
     useEffect(() => {
         if (flow) {
-            setName(flow);
+            setEmail(flow);
         }
     }, [flow]);
 
     const handleLogin = async () => {
-        if (!name.trim()) {
-            ShowToast("Please enter your name", "error");
+        if (!email.trim()) {
+            ShowToast("Please enter your email", "error");
             return;
         }
         if (!password) {
@@ -45,9 +53,14 @@ export const Login = () => {
         }
 
         try {
-            const user = masterQuery("SELECT * FROM users WHERE username = ? LIMIT 1", [name.trim().toLowerCase()]);
+            const cleanQuery = email.trim().toLowerCase();
+            const user = masterQuery(
+                "SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1",
+                [cleanQuery, cleanQuery]
+            );
+
             if (!user || user.length === 0) {
-                ShowToast("User not found", "error");
+                ShowToast("Account not found with this email", "error");
                 return;
             }
 
@@ -56,13 +69,18 @@ export const Login = () => {
                 return;
             }
 
+            const username = user[0].username || cleanQuery;
+
             // Switch to user database
-            switchUserDatabase(name.trim().toLowerCase());
+            switchUserDatabase(username);
 
             const userSession = {
-                username: name.trim().toLowerCase(),
+                username: username,
+                email: user[0].email || cleanQuery,
                 displayName: user[0].display_name || user[0].username,
-                profileImage: user[0].profile_image || null
+                profileImage: user[0].profile_image || null,
+                appPurpose: user[0].app_purpose || 'local',
+                isPremium: Boolean(user[0].is_premium),
             };
 
             // Save session to local storage
@@ -70,8 +88,12 @@ export const Login = () => {
 
             // Save user in redux
             dispatch(setCurrentUser(userSession.username));
+            dispatch(setCurrentUserEmail(userSession.email));
             dispatch(setCurrentProfileName(userSession.displayName));
             dispatch(setCurrentProfileImage(userSession.profileImage));
+            dispatch(setAppPurpose(userSession.appPurpose));
+            dispatch(setIsPremium(userSession.isPremium));
+            subscriptionService.init(userSession.isPremium, userSession.appPurpose);
 
             // Sync services
             loginOneSignalUser(userSession.username);
@@ -106,15 +128,17 @@ export const Login = () => {
                             </CustomText>
                             <View style={{ gap: resAvarage(1), marginBottom: resAvarage(3) }} >
                                 <CustomText style={styles.title} >Your money, made calm.</CustomText>
-                                <CustomText style={styles.subtitle} >Sign in to continue your reflection.</CustomText>
+                                <CustomText style={styles.subtitle} >Sign in with your email to continue.</CustomText>
                             </View>
                             <View style={{ gap: resAvarage(0) }}>
                                 <CustomInput
-                                    label={"Name"}
-                                    Prefix={User}
-                                    placeholder={"Your name"}
-                                    value={name}
-                                    onChangeText={setName}
+                                    label={"Email Address"}
+                                    Prefix={MailIcon}
+                                    placeholder={"name@example.com"}
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
                                 />
                                 <CustomInput
                                     label={"Password"}
@@ -125,7 +149,7 @@ export const Login = () => {
                                     onChangeText={setPassword}
                                 />
                             </View>
-                            <TouchableOpacity onPress={() => navigate("ForgotPassword")} activeOpacity={0.7}>
+                            <TouchableOpacity onPress={() => navigate("ForgotPassword", { prefilledEmail: email.trim() })} activeOpacity={0.7}>
                                 <CustomText style={styles.for} >{"Forgot password?"}</CustomText>
                             </TouchableOpacity>
                         </View>

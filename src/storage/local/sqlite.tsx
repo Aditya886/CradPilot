@@ -20,11 +20,23 @@ masterDb.execute(`
 `);
 
 try {
+    masterDb.execute(`ALTER TABLE users ADD COLUMN email TEXT;`);
+} catch (e) {}
+
+try {
     masterDb.execute(`ALTER TABLE users ADD COLUMN display_name TEXT;`);
 } catch (e) {}
 
 try {
     masterDb.execute(`ALTER TABLE users ADD COLUMN profile_image TEXT;`);
+} catch (e) {}
+
+try {
+    masterDb.execute(`ALTER TABLE users ADD COLUMN app_purpose TEXT;`);
+} catch (e) {}
+
+try {
+    masterDb.execute(`ALTER TABLE users ADD COLUMN is_premium INTEGER DEFAULT 0;`);
 } catch (e) {}
 
 let db = open({

@@ -24,6 +24,7 @@ import {
     ChevronRightIcon,
 } from './components/TuitionIcons';
 import { tuitionStorage } from '../../../../services/tuitionStorage';
+import { subscriptionService } from '../../../../services/subscriptionService';
 
 const SUGGESTED_SUBJECTS = [
     'Mathematics',
@@ -183,6 +184,11 @@ export default function AddStudent() {
         }
         if (!classGrade.trim()) {
             showFlashMessage('Please enter student class', 'error');
+            return;
+        }
+
+        const check = subscriptionService.canAddEntry();
+        if (!check.allowed) {
             return;
         }
 

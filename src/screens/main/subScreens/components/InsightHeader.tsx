@@ -9,13 +9,15 @@ import Back from '../../../../assets/images/icons/back.svg';
 import { colors } from '../../../../utils/colors';
 import { goBack } from '../../../../navigation/NavigationUtils';
 
-export default function InsightHeader({ title, subtitle, rightComponent }: any) {
+export default function InsightHeader({ title, subtitle, rightComponent, hideBack }: any) {
     return (
         <View style={styles.main}>
             <View style={styles.row} >
-                <TouchableOpacity activeOpacity={0.7} onPress={() => goBack()} style={styles.back} >
-                    <Back width={resAvarage(5)} height={resAvarage(5)} />
-                </TouchableOpacity>
+                {!hideBack && (
+                    <TouchableOpacity activeOpacity={0.7} onPress={() => goBack()} style={styles.back} >
+                        <Back width={resAvarage(5)} height={resAvarage(5)} />
+                    </TouchableOpacity>
+                )}
                 <View>
                     <CustomText style={styles.title}>{title}</CustomText>
                     <CustomText style={styles.header}>{subtitle}</CustomText>

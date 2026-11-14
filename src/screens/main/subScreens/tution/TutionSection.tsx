@@ -21,7 +21,7 @@ import { ExportColumn } from '../../../../services/exportService';
 import { importService } from '../../../../services/importService';
 import { tuitionStorage } from '../../../../services/tuitionStorage';
 
-export default function TutionSection() {
+export default function TutionSection({ isHomeScreen }: any) {
     const [showFooter, setShowFooter] = useState(true);
     const [showExportModal, setShowExportModal] = useState(false);
     const [students, setStudents] = useState<any[]>([]);
@@ -102,6 +102,7 @@ export default function TutionSection() {
             <InsightHeader
                 title={"Tution Center"}
                 subtitle={"Fees & Payments"}
+                hideBack={isHomeScreen}
                 rightComponent={
                     <ExportImportButton onPress={() => setShowExportModal(true)} />
                 }
@@ -128,7 +129,7 @@ export default function TutionSection() {
             />
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[styles.scrollContent, isHomeScreen && { paddingBottom: resAvarage(22) }]}
             >
                 <TuitionTotalCard
                     totalFeeCollected={26100}

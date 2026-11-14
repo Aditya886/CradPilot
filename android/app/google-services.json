@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1081325823225",
+    "project_id": "credpilot-60019",
+    "storage_bucket": "credpilot-60019.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1081325823225:android:f28cdbf07a285d73dd2e28",
+        "android_client_info": {
+          "package_name": "com.credpilot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqSjLc1RpqTpNKONTva-1j3AUWnoT4j7w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
