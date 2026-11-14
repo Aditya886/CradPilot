@@ -13,6 +13,7 @@ import { setCurrentUser, setCurrentProfileName, setCurrentProfileImage } from '.
 import AsyncStorageUtils from '../../../../utils/storage'
 import { logoutOneSignalUser } from '../../../../services/oneSignalService'
 import { cancelAllLocalNotifications } from '../../../../services/localNotificationService'
+import { checkForAppUpdates } from '../../../../services/inAppUpdateService'
 
 export default function MoreList({ data, title, onLogoutPress }: any) {
     const dispatch = useAppDispatch();
@@ -75,7 +76,7 @@ export default function MoreList({ data, title, onLogoutPress }: any) {
             });
         }
         if (item?.title === "About CredPilot") {
-            // navigate("AboutCredPilot")
+            checkForAppUpdates(true);
         }
     }
     return (
