@@ -35,57 +35,6 @@ interface StudentAttendanceCalendarProps {
   attendanceData?: Record<string, 'present' | 'absent' | 'holiday'>;
 }
 
-// Sample fee and attendance data matching the UI designs
-const DEFAULT_PAID_DATES = [
-  '2026-07-03',
-  '2026-08-03',
-  '2026-09-03',
-  '2026-10-03',
-];
-
-const DEFAULT_UPCOMING_DATES = [
-  '2026-10-20',
-  '2026-11-03',
-  '2026-12-03',
-];
-
-const DEFAULT_ATTENDANCE: Record<string, 'present' | 'absent' | 'holiday'> = {
-  // October 2026
-  '2026-10-02': 'holiday', // Holiday / Teacher Absent
-  '2026-10-05': 'present',
-  '2026-10-06': 'present',
-  '2026-10-07': 'present',
-  '2026-10-08': 'present',
-  '2026-10-09': 'present',
-  '2026-10-10': 'absent',
-  '2026-10-12': 'present',
-  '2026-10-13': 'present',
-  '2026-10-14': 'present',
-  '2026-10-24': 'holiday', // Holiday / Teacher Absent
-
-  // September 2026
-  '2026-09-05': 'holiday', // Teacher Absent
-  '2026-09-07': 'present',
-  '2026-09-08': 'present',
-  '2026-09-09': 'present',
-  '2026-09-11': 'present',
-  '2026-09-14': 'present',
-  '2026-09-15': 'absent',
-  '2026-09-18': 'present',
-  '2026-09-21': 'present',
-  '2026-09-22': 'present',
-  '2026-09-25': 'present',
-  '2026-09-28': 'present',
-
-  // November 2026
-  '2026-11-04': 'present',
-  '2026-11-06': 'present',
-  '2026-11-09': 'present',
-  '2026-11-11': 'absent',
-  '2026-11-13': 'present',
-  '2026-11-20': 'holiday',
-};
-
 const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -96,11 +45,11 @@ const DAY_NAMES = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const StudentAttendanceCalendar: React.FC<StudentAttendanceCalendarProps> = ({
   onDateSelect,
   onMonthChange,
-  initialMonth = 9, // October (0-indexed)
-  initialYear = 2026,
-  paidDates = DEFAULT_PAID_DATES,
-  upcomingDueDates = DEFAULT_UPCOMING_DATES,
-  attendanceData = DEFAULT_ATTENDANCE,
+  initialMonth = new Date().getMonth(),
+  initialYear = new Date().getFullYear(),
+  paidDates = [],
+  upcomingDueDates = [],
+  attendanceData = {},
 }) => {
   const [currentMonth, setCurrentMonth] = useState<number>(initialMonth);
   const [currentYear, setCurrentYear] = useState<number>(initialYear);
@@ -109,8 +58,8 @@ const StudentAttendanceCalendar: React.FC<StudentAttendanceCalendarProps> = ({
   const [isYearModalVisible, setIsYearModalVisible] = useState(false);
   const [yearPageStart, setYearPageStart] = useState<number>(() => Math.floor(initialYear / 12) * 12);
 
-  // Today reference (Oct 15, 2026 as per design or current date)
-  const todayString = '2026-10-15';
+  // Today reference
+  const todayString = new Date().toISOString().split('T')[0];
 
   const getDaysInMonth = (month: number, year: number): number => {
     return new Date(year, month + 1, 0).getDate();

@@ -10,7 +10,6 @@ import { colors } from '../../../utils/colors'
 import { FontMedium } from '../../../utils/fontFamily'
 import { font10 } from '../../../utils/fontSizes'
 import { resAvarage, resWidth } from '../../../utils/responsive'
-import Recent from './components/Recent'
 import RecentActivity from './components/RecentActivity'
 import { CustomSearch } from '../../../ui/components/CustomSearch'
 import CommonList from '../../../ui/components/CommonList'
@@ -26,11 +25,16 @@ import ExportImportButton from '../../../ui/components/ExportImportButton'
 import ExportImportModal from '../../../ui/modals/ExportImportModal'
 import { ExportColumn } from '../../../services/exportService'
 import { importService } from '../../../services/importService'
+import { useGetDebtsDashboardQuery, useGetDebtPersonsQuery } from '../../../API'
 
 export default function Debts({ route, navigation, isHomeScreen }: any) {
     const [selected, setSelected] = useState("Home")
     const [selectedActivity, setSelectedActivity] = useState(ActivityList[0])
     const [selectedPersonFilter, setSelectedPersonFilter] = useState(PersonList[0])
+
+    // RTK Query Debts integration
+    const { data: dashboardRes, refetch: refetchDebtsDashboard } = useGetDebtsDashboardQuery();
+    const { data: apiPersonsRes, refetch: refetchDebtPersons } = useGetDebtPersonsQuery(undefined);
 
     const [debtPersons, setDebtPersons] = useState<any[]>([])
     const [debtTransactions, setDebtTransactions] = useState<any[]>([])
@@ -94,11 +98,13 @@ export default function Debts({ route, navigation, isHomeScreen }: any) {
     useFocusEffect(
         React.useCallback(() => {
             loadDebtsData();
+            refetchDebtsDashboard();
+            refetchDebtPersons();
             if (route?.params?.openAddTxn) {
                 setShowAddTxnModal(true);
                 navigation.setParams({ openAddTxn: undefined });
             }
-        }, [route?.params?.openAddTxn, navigation])
+        }, [route?.params?.openAddTxn, navigation, refetchDebtsDashboard, refetchDebtPersons])
     );
 
     const overallMetrics = React.useMemo(() => {

@@ -20,15 +20,15 @@ interface StudentProfileCardProps {
 }
 
 export default function StudentProfileCard({
-    name = 'Aman Kumar',
-    classGrade = 'Class 10',
-    sinceDate = '15 Jun 2026',
-    parentName = 'Rekha Kumar',
-    batchName = 'Evening Seniors',
-    batchTiming = '5:00 PM – 7:00 PM',
-    batchDays = 'Mon, Wed, Fri',
-    phone = '99582 11870',
-    subjects = ['Mathematics', 'Physics'],
+    name = '',
+    classGrade = '',
+    sinceDate = '',
+    parentName = '',
+    batchName = '',
+    batchTiming = '',
+    batchDays = '',
+    phone = '',
+    subjects = [],
 }: StudentProfileCardProps) {
     return (
         <View style={styles.card}>

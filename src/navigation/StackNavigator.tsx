@@ -27,6 +27,9 @@ import Batch from "../screens/main/subScreens/tution/Batch";
 import AddStudent from "../screens/main/subScreens/tution/AddStudent";
 import WebViewScreen from "../screens/main/subScreens/WebViewScreen";
 import Debts from "../screens/main/bottomTabs/Debts";
+import SavingAndGoalsScreen from "../screens/main/subScreens/savingAndGoals/SavingAndGoalsScreen";
+import EmiLoansScreen from "../screens/main/subScreens/emiLoans/EmiLoansScreen";
+import EmiLoanDetailScreen from "../screens/main/subScreens/emiLoans/EmiLoanDetailScreen";
 
 const Stack = createNativeStackNavigator<any>();
 
@@ -165,6 +168,26 @@ export const StackNavigation = () => {
             <Stack.Screen
                 name="AddStudent"
                 component={AddStudent}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="SavingAndGoals"
+                component={SavingAndGoalsScreen}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="SavingsGoals"
+                component={SavingAndGoalsScreen}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="EmiLoans"
+                component={EmiLoansScreen}
+                options={{ headerShown: false }}
+            />
+            <Stack.Screen
+                name="EmiLoanDetail"
+                component={EmiLoanDetailScreen}
                 options={{ headerShown: false }}
             />
             <Stack.Screen

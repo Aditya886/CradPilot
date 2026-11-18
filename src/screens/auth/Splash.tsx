@@ -12,7 +12,6 @@ import { colors } from "../../utils/colors"
 import { BlurView } from '@sbaiahmed1/react-native-blur';
 import AsyncStorageUtils from "../../utils/storage"
 import { loginOneSignalUser } from "../../services/oneSignalService"
-import { syncNotifications } from "../../services/localNotificationService"
 import { switchUserDatabase } from "../../storage/local/sqlite"
 
 export const Splash = () => {
@@ -56,9 +55,8 @@ export const Splash = () => {
                     dispatch(setIsPremium(Boolean(session.isPremium)));
                     subscriptionService.init(Boolean(session.isPremium), session.appPurpose || 'local');
 
-                    // OneSignal and local notifications sync
-                    loginOneSignalUser(session.username);
-                    syncNotifications();
+                    // OneSignal user identify
+                    loginOneSignalUser(session.username, session.email);
 
                     // Navigate directly to app
                     resetAndNavigate("BottomTab");

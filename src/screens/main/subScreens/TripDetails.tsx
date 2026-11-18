@@ -24,6 +24,8 @@ import ExportImportButton from '../../../ui/components/ExportImportButton'
 import ExportImportModal from '../../../ui/modals/ExportImportModal'
 import { ExportColumn } from '../../../services/exportService'
 import { importService } from '../../../services/importService'
+import { useAddPlanSpendMutation, useDeletePlanSpendMutation } from '../../../API'
+import { ShowToast } from '../../../utils/CustomToast/ToastManager'
 
 interface MemberData {
     id: string
@@ -52,6 +54,8 @@ interface SettlementData {
 export default function TripDetails({ route }: any) {
     const plan = route?.params?.plan
     const planIdNum = plan?.id ? parseInt(plan.id, 10) : 0
+    const [addPlanSpendApi] = useAddPlanSpendMutation()
+    const [deletePlanSpendApi] = useDeletePlanSpendMutation()
 
     const [showAddSpendModal, setShowAddSpendModal] = useState(false)
     const [showAddPersonModal, setShowAddPersonModal] = useState(false)
@@ -171,40 +175,60 @@ export default function TripDetails({ route }: any) {
     }, [membersList])
 
     // Handlers
-    const handleAddSpend = (data: {
+    const handleAddSpend = async (data: {
         title: string;
         amount: number;
         paidBy: string;
         payerAmounts?: { person: string; amount: number }[];
     }) => {
-        try {
-            const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-            if (data.payerAmounts && data.payerAmounts.length > 1) {
-                data.payerAmounts.forEach(pa => {
-                    if (pa.amount > 0) {
-                        insert('plan_spends', {
-                            plan_id: planIdNum,
-                            title: `${data.title} (${pa.person})`,
-                            amount: pa.amount,
-                            paid_by: pa.person,
-                            date: todayStr,
-                        })
-                    }
-                })
-            } else {
-                insert('plan_spends', {
-                    plan_id: planIdNum,
-                    title: data.title,
-                    amount: data.amount,
-                    paid_by: data.paidBy,
-                    date: todayStr,
-                })
-            }
-            loadDataFromDB()
-        } catch (error) {
-            console.error('Error adding spend in SQLite:', error)
+        const payload = {
+            title: data.title,
+            amount: data.amount,
+            paidBy: data.paidBy,
+            date: new Date().toISOString(),
+        };
+
+        const res: any = await addPlanSpendApi({
+            planId: String(plan?.id || planIdNum),
+            body: payload,
+        });
+
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || 'Expense added successfully', 'success');
+
+            try {
+                const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                if (data.payerAmounts && data.payerAmounts.length > 1) {
+                    data.payerAmounts.forEach(pa => {
+                        if (pa.amount > 0) {
+                            insert('plan_spends', {
+                                plan_id: planIdNum,
+                                title: `${data.title} (${pa.person})`,
+                                amount: pa.amount,
+                                paid_by: pa.person,
+                                date: todayStr,
+                            });
+                        }
+                    });
+                } else {
+                    insert('plan_spends', {
+                        plan_id: planIdNum,
+                        title: data.title,
+                        amount: data.amount,
+                        paid_by: data.paidBy,
+                        date: todayStr,
+                    });
+                }
+            } catch (err) {}
+
+            loadDataFromDB();
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to add spend', 'error');
+            return;
         }
-    }
+    };
 
     const handleAddPerson = (name: string) => {
         try {

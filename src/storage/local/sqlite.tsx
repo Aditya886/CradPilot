@@ -105,6 +105,57 @@ export const switchUserDatabase = (username: string) => {
           );
         `);
 
+        try {
+            db.execute(`ALTER TABLE goals ADD COLUMN timeline TEXT;`);
+        } catch (e) {}
+        try {
+            db.execute(`ALTER TABLE goals ADD COLUMN status TEXT DEFAULT 'active';`);
+        } catch (e) {}
+        try {
+            db.execute(`ALTER TABLE goals ADD COLUMN created_at TEXT;`);
+        } catch (e) {}
+
+        db.execute(`
+          CREATE TABLE IF NOT EXISTS goal_contributions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            goal_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            date TEXT NOT NULL,
+            notes TEXT,
+            FOREIGN KEY(goal_id) REFERENCES goals(id) ON DELETE CASCADE
+          );
+        `);
+
+        db.execute(`
+          CREATE TABLE IF NOT EXISTS emi_loans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            lender TEXT NOT NULL,
+            amount REAL NOT NULL,
+            rate REAL NOT NULL,
+            tenure INTEGER NOT NULL,
+            start_date TEXT NOT NULL,
+            emi_amount REAL NOT NULL,
+            paid_emis INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active',
+            created_at TEXT NOT NULL
+          );
+        `);
+
+        db.execute(`
+          CREATE TABLE IF NOT EXISTS emi_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            loan_id INTEGER NOT NULL,
+            emi_number INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            principal_component REAL NOT NULL,
+            interest_component REAL NOT NULL,
+            date TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(loan_id) REFERENCES emi_loans(id) ON DELETE CASCADE
+          );
+        `);
+
         db.execute(`
           CREATE TABLE IF NOT EXISTS debt_persons (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

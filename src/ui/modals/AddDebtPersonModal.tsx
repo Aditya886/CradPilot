@@ -10,7 +10,8 @@ import Cross from '../../assets/images/icons/cross.svg';
 import { insert, getWhere } from '../../storage/local/sqlite';
 import Toast from 'react-native-toast-message';
 import { subscriptionService } from '../../services/subscriptionService';
-import { syncNotifications } from '../../services/localNotificationService';
+import { useCreateDebtPersonMutation, extractApiErrorMessage } from '../../API';
+import { ShowToast } from '../../utils/CustomToast/ToastManager';
 
 interface AddDebtPersonModalProps {
     show: boolean;
@@ -25,6 +26,7 @@ export default function AddDebtPersonModal({
 }: AddDebtPersonModalProps) {
     const transformY = useRef(new Animated.Value(resHeight(100))).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const [createDebtPersonApi, { isLoading: isCreating }] = useCreateDebtPersonMutation();
 
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
@@ -65,51 +67,40 @@ export default function AddDebtPersonModal({
         }).start(() => setShow(false));
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (isButtonDisabled) return;
 
         const check = subscriptionService.canAddEntry();
         if (!check.allowed) {
+            ShowToast('Storage limit reached. Please upgrade to Pro.', 'error');
             close();
             return;
         }
 
-        try {
-            // Check if phone number already exists
-            const existing = getWhere('debt_persons', 'phone = ?', [phone.trim()]);
-            if (existing && existing.length > 0) {
-                Toast.show({
-                    type: 'error',
-                    text1: 'Duplicate Person',
-                    text2: 'A person with this phone number already exists.',
+        const payload = {
+            name: name.trim(),
+            phone: phone.trim(),
+        };
+
+        const res: any = await createDebtPersonApi(payload);
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || 'Person added successfully!', 'success');
+
+            try {
+                insert('debt_persons', {
+                    name: name.trim(),
+                    phone: phone.trim(),
+                    created_at: new Date().toISOString(),
                 });
-                return;
-            }
-
-            insert('debt_persons', {
-                name: name.trim(),
-                phone: phone.trim(),
-                created_at: new Date().toISOString(),
-            });
-
-            // Sync notifications
-            syncNotifications();
-
-            Toast.show({
-                type: 'success',
-                text1: 'Success',
-                text2: 'Person added successfully!',
-            });
+            } catch (err) {}
 
             onAddSuccess();
             close();
-        } catch (error) {
-            console.error('Error adding debt person:', error);
-            Toast.show({
-                type: 'error',
-                text1: 'Error',
-                text2: 'Failed to add person.',
-            });
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to add person', 'error');
+            return;
         }
     };
 

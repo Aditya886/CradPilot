@@ -7,7 +7,6 @@ import { colors } from '../../../../utils/colors'
 import { FontMedium, FontRegular, FontSemiBold } from '../../../../utils/fontFamily'
 import { ACCOUNT_TYPES } from '../../../../assets/DefaultData'
 import Add from '../../../../assets/images/icons/plus.svg'
-import { InsightAccountTypes } from '../../../../assets/dummy/dummy'
 import Up from '../../../../assets/images/icons/inc.svg'
 import Down from '../../../../assets/images/icons/dec.svg'
 

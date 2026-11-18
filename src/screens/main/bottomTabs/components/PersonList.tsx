@@ -6,7 +6,6 @@ import { colors } from '../../../../utils/colors'
 import { FontSemiBold, FontRegular, FontMedium } from '../../../../utils/fontFamily'
 import { font20, font14, font12, font13, font18, font16 } from '../../../../utils/fontSizes'
 import { resAvarage, resWidth } from '../../../../utils/responsive'
-import { personData } from '../../../../assets/dummy/dummy'
 import Next from '../../../../assets/images/icons/next.svg'
 import { navigate } from '../../../../navigation/NavigationUtils'
 

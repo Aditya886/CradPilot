@@ -15,6 +15,7 @@ import Check from "../../assets/images/icons/check.svg"
 import Log from "../../assets/images/icons/login.svg"
 import { ShowToast } from "../../utils/CustomToast/ToastManager"
 import { masterQuery, masterUpdate } from "../../storage/local/sqlite"
+import { useSendForgotPasswordOtpMutation, useVerifyResetPasswordMutation, extractApiErrorMessage } from "../../API"
 import Svg, { Path, Rect } from 'react-native-svg'
 
 const MailIcon = (props: any) => (
@@ -31,11 +32,13 @@ export default function ForgotPassword() {
     const [email, setEmail] = useState("")
     const [userRecord, setUserRecord] = useState<any>(null)
     const [otp, setOtp] = useState("")
-    const [generatedOtp, setGeneratedOtp] = useState("")
     const [timer, setTimer] = useState(45)
     const [newPassword, setNewPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
     const otpInputRef = useRef<TextInput>(null)
+
+    const [sendForgotOtpApi, { isLoading: isSendingForgotOtp }] = useSendForgotPasswordOtpMutation()
+    const [verifyResetApi, { isLoading: isResettingPassword }] = useVerifyResetPasswordMutation()
 
     useEffect(() => {
         if (prefilledEmail) {
@@ -59,7 +62,7 @@ export default function ForgotPassword() {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
     };
 
-    const handleSendResetCode = () => {
+    const handleSendResetCode = async () => {
         const cleanEmail = email.trim().toLowerCase();
         if (!cleanEmail || !validateEmail(cleanEmail)) {
             ShowToast("Please enter a valid registered email", "error");
@@ -67,40 +70,57 @@ export default function ForgotPassword() {
         }
 
         try {
-            const user = masterQuery(
-                "SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1",
-                [cleanEmail, cleanEmail]
-            );
+            // Attempt sending OTP via backend
+            const res: any = await sendForgotOtpApi({ email: cleanEmail });
+            if (res?.data?.success || (res?.data && !res?.error)) {
+                console.log("res -----", res);
+                const user = masterQuery(
+                    "SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1",
+                    [cleanEmail, cleanEmail]
+                );
 
-            if (!user || user.length === 0) {
-                ShowToast("No account found with this email", "error");
+                if (user && user.length > 0) {
+                    setUserRecord(user[0]);
+                } else {
+                    setUserRecord({ email: cleanEmail, username: cleanEmail });
+                }
+
+                setOtp("");
+                setStep(2);
+                setTimer(45);
+                ShowToast(res?.data?.message || `Reset verification code sent to ${cleanEmail}`, "success");
+
+                setTimeout(() => {
+                    otpInputRef.current?.focus();
+                }, 300);
+            } else {
+                console.log("res error -----", res);
+                ShowToast(res?.error?.data?.message || res?.data?.message || "No account found with this email", "error");
                 return;
             }
-
-            setUserRecord(user[0]);
-            const code = Math.floor(100000 + Math.random() * 900000).toString();
-            setGeneratedOtp(code);
-            setOtp("");
-            setStep(2);
-            setTimer(45);
-            ShowToast(`Reset verification code sent to ${cleanEmail}`, "info");
-
-            setTimeout(() => {
-                otpInputRef.current?.focus();
-            }, 300);
         } catch (e) {
             console.error("Forgot password lookup error:", e);
             ShowToast("Failed to initiate password reset", "error");
         }
     };
 
-    const handleResendOtp = () => {
+    const handleResendOtp = async () => {
         if (timer > 0) return;
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        setGeneratedOtp(code);
-        setTimer(45);
-        setOtp("");
-        ShowToast(`New reset code sent to ${email.trim()}`, "info");
+        const cleanEmail = email.trim().toLowerCase();
+        try {
+            const res: any = await sendForgotOtpApi({ email: cleanEmail });
+            if (res?.data?.success || (res?.data && !res?.error)) {
+                console.log("res -----", res);
+                ShowToast(res?.data?.message || `New reset code sent to ${cleanEmail}`, "success");
+                setTimer(45);
+                setOtp("");
+            } else {
+                console.log("res error -----", res);
+                ShowToast(res?.error?.data?.message || res?.data?.message || "Failed to resend code", "error");
+            }
+        } catch (e: any) {
+            ShowToast(extractApiErrorMessage(e, "Failed to resend code"), "error");
+        }
     };
 
     const handleVerifyOtp = () => {
@@ -110,15 +130,10 @@ export default function ForgotPassword() {
             return;
         }
 
-        if (cleanOtp !== generatedOtp && cleanOtp !== '123456') {
-            ShowToast("Invalid verification code. Please try again.", "error");
-            return;
-        }
-
         setStep(3);
     };
 
-    const handleResetPassword = () => {
+    const handleResetPassword = async () => {
         if (newPassword.length < 6) {
             ShowToast("Password must be at least 6 characters", "error");
             return;
@@ -128,15 +143,34 @@ export default function ForgotPassword() {
             return;
         }
 
-        try {
-            masterUpdate("users", userRecord.id, {
-                password: newPassword,
-            });
-            ShowToast("Password reset successfully! Please sign in.", "success");
-            navigate("Login", { flow: userRecord.email || userRecord.username });
-        } catch (e) {
-            console.error("Password reset update error:", e);
-            ShowToast("Failed to reset password", "error");
+        const cleanEmail = email.trim().toLowerCase();
+        const cleanOtp = otp.trim();
+
+        // Attempt backend reset
+        const res: any = await verifyResetApi({
+            email: cleanEmail,
+            otp: cleanOtp,
+            newPassword: newPassword,
+        });
+
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            try {
+                if (userRecord?.id) {
+                    masterUpdate("users", userRecord.id, {
+                        password: newPassword,
+                    });
+                }
+                ShowToast(res?.data?.message || "Password reset successfully! Please sign in.", "success");
+                navigate("Login", { flow: cleanEmail });
+            } catch (e) {
+                console.error("Password reset update error:", e);
+                ShowToast("Failed to reset password", "error");
+            }
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || "Failed to reset password", "error");
+            return;
         }
     };
 
@@ -183,6 +217,8 @@ export default function ForgotPassword() {
 
                                 <View style={{ marginTop: resAvarage(2) }}>
                                     <CustomButton
+                                        loading={isSendingForgotOtp}
+                                        disabled={isSendingForgotOtp}
                                         onPress={handleSendResetCode}
                                         style={{ marginBottom: resAvarage(3) }}
                                         title={"Send Reset Code"}
@@ -212,21 +248,6 @@ export default function ForgotPassword() {
                                         <CustomText style={styles.emailPillText}>{email.trim()}</CustomText>
                                     </View>
                                 </View>
-
-                                {/* Demo Helper Card */}
-                                <TouchableOpacity
-                                    activeOpacity={0.8}
-                                    onPress={() => setOtp(generatedOtp)}
-                                    style={styles.demoCard}
-                                >
-                                    <View style={styles.demoCardLeft}>
-                                        <CustomText style={styles.demoCardTitle}>Reset Code</CustomText>
-                                        <CustomText style={styles.demoCardCode}>{generatedOtp}</CustomText>
-                                    </View>
-                                    <View style={styles.demoCardButton}>
-                                        <CustomText style={styles.demoCardButtonText}>Tap to autofill</CustomText>
-                                    </View>
-                                </TouchableOpacity>
 
                                 {/* 6-Digit OTP Box Grid */}
                                 <View style={styles.otpSection}>
@@ -319,6 +340,8 @@ export default function ForgotPassword() {
 
                                 <View style={{ marginTop: resAvarage(2) }}>
                                     <CustomButton
+                                        loading={isResettingPassword}
+                                        disabled={isResettingPassword}
                                         onPress={handleResetPassword}
                                         style={{ marginBottom: resAvarage(3) }}
                                         title={"Reset Password"}
@@ -396,49 +419,6 @@ const styles = StyleSheet.create({
     emailPillText: {
         fontFamily: FontBold,
         fontSize: font14,
-        color: colors.black,
-    },
-    demoCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: scaleSize(12),
-        paddingHorizontal: resAvarage(2.5),
-        paddingVertical: resAvarage(2),
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderWidth: 1.5,
-        borderColor: colors.theme,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-    },
-    demoCardLeft: {
-        gap: resAvarage(0.3),
-    },
-    demoCardTitle: {
-        fontSize: font11,
-        fontFamily: FontMedium,
-        color: colors.black60,
-        textTransform: 'uppercase',
-        letterSpacing: resAvarage(0.1),
-    },
-    demoCardCode: {
-        fontSize: font24,
-        fontFamily: FontBold,
-        letterSpacing: scaleSize(4),
-        color: colors.black,
-    },
-    demoCardButton: {
-        backgroundColor: colors.theme,
-        paddingHorizontal: resAvarage(2),
-        paddingVertical: resAvarage(1),
-        borderRadius: scaleSize(8),
-    },
-    demoCardButtonText: {
-        fontSize: font12,
-        fontFamily: FontBold,
         color: colors.black,
     },
     otpSection: {

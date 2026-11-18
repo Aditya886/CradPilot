@@ -12,8 +12,8 @@ import { useAppDispatch, useAppSelector } from '../../../../utils/hooks'
 import { setCurrentUser, setCurrentProfileName, setCurrentProfileImage } from '../../../../storage/redux/silce/AuthSlice'
 import AsyncStorageUtils from '../../../../utils/storage'
 import { logoutOneSignalUser } from '../../../../services/oneSignalService'
-import { cancelAllLocalNotifications } from '../../../../services/localNotificationService'
 import { subscriptionService } from '../../../../services/subscriptionService'
+import { checkForAppUpdates } from '../../../../services/inAppUpdateService'
 
 export default function MoreList({ data, title, onLogoutPress, onSubscriptionPress }: any) {
     const dispatch = useAppDispatch();
@@ -36,7 +36,6 @@ export default function MoreList({ data, title, onLogoutPress, onSubscriptionPre
             try {
                 await AsyncStorageUtils.removeItem('user_session');
                 logoutOneSignalUser();
-                await cancelAllLocalNotifications();
                 dispatch(setCurrentUser(null));
                 dispatch(setCurrentProfileName(null));
                 dispatch(setCurrentProfileImage(null));
@@ -57,38 +56,27 @@ export default function MoreList({ data, title, onLogoutPress, onSubscriptionPre
             return;
         }
 
-        // Check if item belongs to a purpose type that is locked on Free plan
-        if (item?.purposeType) {
-            const isLocked = !isPremium && item.purposeType !== currentPurpose;
-            if (isLocked) {
-                subscriptionService.showUpgradeModal({
-                    title: `${item.title} Locked`,
-                    subtitle: `Your account is set to ${getPurposeName(currentPurpose)}. On the Free plan, other modes are locked. Upgrade to CredPilot Pro to unlock all modes and switch anytime!`,
-                    reason: 'mode_locked',
-                });
-                return;
-            }
+        const isMoreFeatures = title === 'More Features';
+        const isSubscription = item?.id === 'subscription' || item?.title === 'Subscription';
+        const isInsights = item?.id === 'insights' || item?.title === 'Insights';
+        const belongsToCurrent = isSubscription || isInsights || (item?.purposes && item.purposes.includes(currentPurpose));
+        const isItemLocked = isMoreFeatures && !isPremium && !belongsToCurrent;
 
-            if (item.purposeType === 'local') {
-                navigate("Debts");
-                return;
-            }
-            if (item.purposeType === 'tution') {
-                navigate("TutionSection");
-                return;
-            }
-            if (item.purposeType === 'finance') {
-                navigate("FinanceSection");
-                return;
-            }
+        if (isItemLocked) {
+            subscriptionService.showUpgradeModal({
+                title: `${item.title} Locked`,
+                subtitle: `Your account is set to ${getPurposeName(currentPurpose)}. On the Free plan, other modes are locked. Upgrade to CredPilot Pro to unlock all modes and switch anytime!`,
+                reason: 'mode_locked',
+            });
+            return;
         }
 
-        if (item?.title === "Savings & Goals") {
-            ShowToast("Coming Soon", "info");
-        } else if (item?.title === "Home Banking") {
-            ShowToast("Coming Soon", "info");
+        if (item?.id === 'insights' || item?.title === "Insights") {
+            navigate("Insights");
+        } else if (item?.title === "Savings & Goals") {
+            navigate("SavingAndGoals");
         } else if (item?.title === "EMI & Loans") {
-            ShowToast("Coming Soon", "info");
+            navigate("EmiLoans");
         } else if (item?.title === "Plans & Trips") {
             navigate("PlanTrip");
         } else if (item?.title === "Tution" || item?.title === "Tuition Center") {
@@ -109,22 +97,55 @@ export default function MoreList({ data, title, onLogoutPress, onSubscriptionPre
                 subtitle: "Legal & Data Policy",
                 url: "https://credpilot.vercel.app/#/privacy",
             });
+        } else if (item?.title === "About CredPilot") {
+            checkForAppUpdates(true);
         }
     };
+
+    const filteredData = React.useMemo(() => {
+        if (!data || !Array.isArray(data)) return [];
+
+        if (title === 'More Features') {
+            return data.filter((item: any) => {
+                // 1. Remove Home banking
+                if (item?.id === 'home_banking' || item?.title === 'Home Banking') {
+                    return false;
+                }
+
+                // 2. Hide whichever section is active on the Home screen
+                if (currentPurpose === 'local' && (item?.id === 'debts' || item?.purposeType === 'local')) {
+                    return false;
+                }
+                if (currentPurpose === 'finance' && (item?.id === 'finance' || item?.purposeType === 'finance')) {
+                    return false;
+                }
+                if (currentPurpose === 'tution' && (item?.id === 'tution' || item?.purposeType === 'tution')) {
+                    return false;
+                }
+
+                // Show all other features (unlocked for active type, and locked PRO for other types)
+                return true;
+            });
+        }
+
+        return data;
+    }, [data, title, currentPurpose]);
 
     return (
         <View style={styles.main}>
             <CustomText style={styles.header}>{title}</CustomText>
             <FlatList
-                data={data}
+                data={filteredData}
                 showsVerticalScrollIndicator={false}
                 scrollEnabled={false}
                 contentContainerStyle={{ gap: resAvarage(1.5), marginVertical: resAvarage(2), paddingHorizontal: resAvarage(3) }}
                 renderItem={({ item }: any) => {
                     const Icon = item?.icon;
+                    const isMoreFeatures = title === 'More Features';
                     const isSubscription = item?.id === 'subscription' || item?.title === 'Subscription';
-                    const isLocked = item?.purposeType && !isPremium && item.purposeType !== currentPurpose;
-                    const isActiveOnHome = item?.purposeType && item.purposeType === currentPurpose;
+                    const isInsights = item?.id === 'insights' || item?.title === 'Insights';
+                    const belongsToCurrent = isSubscription || isInsights || (item?.purposes && item.purposes.includes(currentPurpose));
+                    const isLocked = isMoreFeatures && !isPremium && !belongsToCurrent;
 
                     return (
                         <TouchableOpacity
@@ -156,16 +177,9 @@ export default function MoreList({ data, title, onLogoutPress, onSubscriptionPre
                                             </View>
                                         )}
                                         {isLocked && (
-                                            <View style={[styles.badge, { backgroundColor: '#FEE2E2' }]}>
-                                                <CustomText style={[styles.badgeText, { color: '#DC2626' }]}>
-                                                    🔒 PRO ONLY
-                                                </CustomText>
-                                            </View>
-                                        )}
-                                        {isActiveOnHome && (
-                                            <View style={[styles.badge, { backgroundColor: '#E0E7FF' }]}>
-                                                <CustomText style={[styles.badgeText, { color: '#4338CA' }]}>
-                                                    HOME
+                                            <View style={[styles.badge, { backgroundColor: colors.theme }]}>
+                                                <CustomText style={[styles.badgeText, { color: colors.black }]}>
+                                                    PRO
                                                 </CustomText>
                                             </View>
                                         )}

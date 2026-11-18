@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native'
 import { CommonBg } from '../../../ui/common/CommonBg'
 import InsightHeader from './components/InsightHeader'
@@ -9,7 +9,7 @@ import { FontMedium, FontRegular } from '../../../utils/fontFamily'
 import { font10, font12 } from '../../../utils/fontSizes'
 import { resAvarage, resWidth } from '../../../utils/responsive'
 import { query, insert, removeWhere, getAll } from '../../../storage/local/sqlite'
-import { useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect, useRoute } from '@react-navigation/native'
 import PlanMainCard from './components/PlanMainCard'
 import ButtonSlider from '../../../ui/components/ButtonSlider'
 import PlanCard, { PlanItemData } from './components/PlanCard'
@@ -22,8 +22,13 @@ import ExportImportButton from '../../../ui/components/ExportImportButton'
 import ExportImportModal from '../../../ui/modals/ExportImportModal'
 import { ExportColumn } from '../../../services/exportService'
 import { importService } from '../../../services/importService'
+import { useGetPlansQuery, useCreatePlanMutation, useDeletePlanMutation } from '../../../API'
+import { ShowToast } from '../../../utils/CustomToast/ToastManager'
 
 export default function Insights() {
+    const route = useRoute<any>()
+    const [createPlanApi] = useCreatePlanMutation()
+    const [deletePlanApi] = useDeletePlanMutation()
     const [selected, setSelected] = useState("All")
     const [showNewPlanModal, setShowNewPlanModal] = useState(false)
     const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -32,6 +37,54 @@ export default function Insights() {
     const [plansList, setPlansList] = useState<PlanItemData[]>([])
 
     const slider = ['All', 'Single', 'Group']
+
+    // RTK Query backend integration
+    const { data: apiPlansRes, refetch: refetchPlans } = useGetPlansQuery(
+        selected === 'All' ? undefined : { type: selected }
+    )
+
+    useEffect(() => {
+        if (apiPlansRes && Array.isArray(apiPlansRes.data)) {
+            const apiPlans: PlanItemData[] = apiPlansRes.data.map((p: any) => {
+                const spent = Number(p.spent || 0)
+                const total = Number(p.total || p.budget || 0)
+                const isOver = spent > total
+                const isSettled = spent === total && spent > 0
+                let tagText = ''
+                let statusVariant: 'left' | 'settled' | 'over' = 'left'
+                if (isSettled) {
+                    tagText = 'Settled'
+                    statusVariant = 'settled'
+                } else if (isOver) {
+                    tagText = `₹${(spent - total).toLocaleString()} over`
+                    statusVariant = 'over'
+                } else {
+                    tagText = `₹${Math.max(0, total - spent).toLocaleString()} left`
+                    statusVariant = 'left'
+                }
+                return {
+                    id: String(p._id || p.id),
+                    title: p.title,
+                    type: p.type,
+                    peopleCount: p.membersCount || (Array.isArray(p.members) ? p.members.length : undefined),
+                    itemsCount: p.spendsCount || (Array.isArray(p.spends) ? p.spends.length : 0),
+                    spent,
+                    total,
+                    tagText,
+                    statusVariant,
+                }
+            })
+            if (apiPlans.length > 0) {
+                setPlansList(apiPlans)
+            }
+        }
+    }, [apiPlansRes])
+
+    useEffect(() => {
+        if (route.params?.openNewPlan) {
+            setShowNewPlanModal(true)
+        }
+    }, [route.params])
 
     const loadPlansFromDB = () => {
         try {
@@ -103,49 +156,78 @@ export default function Insights() {
         }
     }, [plansList])
 
-    const handleCreatePlan = (data: { title: string; type: 'Single' | 'Group'; budget: number; note?: string; people?: string[] }) => {
-        try {
-            insert('plans', {
-                title: data.title,
-                type: data.type,
-                total: data.budget,
-                note: data.note || '',
-                created_at: new Date().toISOString(),
-            })
+    const handleCreatePlan = async (data: { title: string; type: 'Single' | 'Group'; budget: number; note?: string; people?: string[] }) => {
+        const payload = {
+            title: data.title,
+            type: data.type,
+            budget: data.budget,
+            note: data.note || '',
+            members: data.people || [],
+        };
 
-            const insertedPlans = query('SELECT * FROM plans WHERE title = ? ORDER BY id DESC LIMIT 1', [data.title])
-            const planId = insertedPlans[0]?.id
+        const res: any = await createPlanApi(payload);
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || 'Plan created successfully!', 'success');
 
-            if (planId && data.type === 'Group' && data.people && data.people.length > 0) {
-                data.people.forEach((pName) => {
-                    insert('plan_members', {
-                        plan_id: planId,
-                        name: pName,
-                        paid: 0,
-                        owes: 0,
-                    })
-                })
-            }
+            try {
+                insert('plans', {
+                    title: data.title,
+                    type: data.type,
+                    total: data.budget,
+                    note: data.note || '',
+                    created_at: new Date().toISOString(),
+                });
 
-            loadPlansFromDB()
-        } catch (error) {
-            console.error('Error creating plan in SQLite:', error)
+                const insertedPlans = query('SELECT * FROM plans WHERE title = ? ORDER BY id DESC LIMIT 1', [data.title]);
+                const planId = insertedPlans[0]?.id;
+
+                if (planId && data.type === 'Group' && data.people && data.people.length > 0) {
+                    data.people.forEach((pName) => {
+                        insert('plan_members', {
+                            plan_id: planId,
+                            name: pName,
+                            paid: 0,
+                            owes: 0,
+                        });
+                    });
+                }
+            } catch (err) {}
+
+            refetchPlans();
+            loadPlansFromDB();
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to create plan', 'error');
+            return;
         }
-    }
+    };
 
-    const handleDeletePlanConfirm = () => {
-        if (!planToDelete) return
-        try {
-            const numId = parseInt(planToDelete.id, 10)
-            removeWhere('plans', 'id = ?', [numId])
-            removeWhere('plan_members', 'plan_id = ?', [numId])
-            removeWhere('plan_spends', 'plan_id = ?', [numId])
-            setPlanToDelete(null)
-            loadPlansFromDB()
-        } catch (error) {
-            console.error('Error deleting plan from SQLite:', error)
+    const handleDeletePlanConfirm = async () => {
+        if (!planToDelete) return;
+
+        const res: any = await deletePlanApi(String(planToDelete.id));
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || 'Plan deleted successfully', 'info');
+
+            try {
+                const numId = parseInt(planToDelete.id, 10);
+                removeWhere('plans', 'id = ?', [numId]);
+                removeWhere('plan_members', 'plan_id = ?', [numId]);
+                removeWhere('plan_spends', 'plan_id = ?', [numId]);
+            } catch (err) {}
+
+            setPlanToDelete(null);
+            setShowDeleteModal(false);
+            refetchPlans();
+            loadPlansFromDB();
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to delete plan', 'error');
+            return;
         }
-    }
+    };
 
     const triggerDeletePlan = (item: PlanItemData) => {
         setPlanToDelete(item)

@@ -7,7 +7,6 @@ import { font11, font26, font12, font20, font24, font14, font10 } from '../../..
 import { resAvarage, resWidth } from '../../../../utils/responsive'
 import CustomImage from '../../../../ui/components/CustomImage'
 import { FlatList } from 'react-native-gesture-handler'
-import { settleList } from '../../../../assets/dummy/dummy'
 
 import { formatINR } from '../../../../utils/FormatUtil'
 import { navigate } from '../../../../navigation/NavigationUtils'

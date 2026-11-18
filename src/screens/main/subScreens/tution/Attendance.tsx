@@ -30,12 +30,15 @@ import ExportImportModal from '../../../../ui/modals/ExportImportModal';
 import { ExportColumn } from '../../../../services/exportService';
 import { importService } from '../../../../services/importService';
 import { tuitionStorage } from '../../../../services/tuitionStorage';
+import { useGetStudentsQuery, useGetBatchesQuery, useBatchMarkAttendanceMutation } from '../../../../API';
+import { ShowToast } from '../../../../utils/CustomToast/ToastManager';
+import { useAppSelector } from '../../../../API/hooks/ReduxHooks';
 
 export interface AttendanceStudent {
     id: string;
     name: string;
     classGrade: string;
-    batch: 'Morning Juniors' | 'Evening Seniors' | 'Board Prep';
+    batch: string;
     status: 'Present' | 'Absent';
     availableSubjects: string[];
     selectedSubjects: string[];
@@ -45,100 +48,6 @@ export interface AttendanceStudent {
     feeAmount: string;
     feeStatus: string;
 }
-
-const INITIAL_STUDENTS: AttendanceStudent[] = [
-    {
-        id: '1',
-        name: 'Rahul Sharma',
-        classGrade: 'Class 8',
-        batch: 'Morning Juniors',
-        status: 'Present',
-        availableSubjects: ['Science', 'English', 'Maths'],
-        selectedSubjects: ['Science', 'English'],
-        isSubjectsExpanded: false,
-        phone: '+91 98765 43211',
-        parentName: 'Anil Sharma',
-        feeAmount: '₹1,500',
-        feeStatus: 'Due Soon',
-    },
-    {
-        id: '2',
-        name: 'Aman Kumar',
-        classGrade: 'Class 10',
-        batch: 'Evening Seniors',
-        status: 'Present',
-        availableSubjects: ['Mathematics', 'Science', 'English'],
-        selectedSubjects: ['Mathematics'],
-        isSubjectsExpanded: false,
-        phone: '+91 98765 43213',
-        parentName: 'Vijay Kumar',
-        feeAmount: '₹2,000',
-        feeStatus: 'Overdue',
-    },
-    {
-        id: '3',
-        name: 'Priya Verma',
-        classGrade: 'Class 9',
-        batch: 'Evening Seniors',
-        status: 'Present',
-        availableSubjects: ['Science', 'English', 'Maths'],
-        selectedSubjects: ['Science', 'English'],
-        isSubjectsExpanded: true, // Expanded by default matching screenshot
-        phone: '+91 98765 43212',
-        parentName: 'Sanjay Verma',
-        feeAmount: '₹1,800',
-        feeStatus: 'Due Soon',
-    },
-    {
-        id: '4',
-        name: 'Ishaan Gupta',
-        classGrade: 'Class 12',
-        batch: 'Board Prep',
-        status: 'Present',
-        availableSubjects: ['Physics', 'Mathematics', 'Chemistry'],
-        selectedSubjects: ['Physics'],
-        isSubjectsExpanded: false,
-        phone: '+91 98765 43215',
-        parentName: 'Manoj Gupta',
-        feeAmount: '₹3,500',
-        feeStatus: 'Paid',
-    },
-    {
-        id: '5',
-        name: 'Sneha Iyer',
-        classGrade: 'Class 11',
-        batch: 'Board Prep',
-        status: 'Present',
-        availableSubjects: ['Physics', 'Chemistry', 'Maths'],
-        selectedSubjects: ['Chemistry'],
-        isSubjectsExpanded: false,
-        phone: '+91 98765 43214',
-        parentName: 'Subramanian Iyer',
-        feeAmount: '₹10,000',
-        feeStatus: 'Overdue',
-    },
-    {
-        id: '6',
-        name: 'Kabir Singh',
-        classGrade: 'Class 6',
-        batch: 'Morning Juniors',
-        status: 'Present',
-        availableSubjects: ['Mathematics', 'Science'],
-        selectedSubjects: ['Mathematics'],
-        isSubjectsExpanded: false,
-        phone: '+91 98765 43210',
-        parentName: 'Ramesh Singh',
-        feeAmount: '₹1,200',
-        feeStatus: 'Due Soon',
-    },
-];
-
-const BATCH_FILTERS = [
-    'All batches',
-    'Morning Juniors',
-    'Evening Seniors',
-    'Board Prep',
-] as const;
 
 const MONTH_NAMES = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -153,7 +62,6 @@ const MONTH_NAMES_FULL = [
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const SHORT_WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-type BatchFilter = (typeof BATCH_FILTERS)[number];
 type StatusFilter = 'All' | 'Present' | 'Absent';
 
 interface AttendanceProps {
@@ -165,15 +73,80 @@ interface AttendanceProps {
 }
 
 export default function Attendance({ route }: AttendanceProps) {
-    const initialBatch = (route?.params?.selectedBatchTitle as BatchFilter) || 'All batches';
+    const initialBatch = route?.params?.selectedBatchTitle || 'All batches';
 
-    const [students, setStudents] = useState<AttendanceStudent[]>(INITIAL_STUDENTS);
+    const reduxBatches = useAppSelector(state => state.tuition.batches);
+    const [batchMarkAttendanceApi] = useBatchMarkAttendanceMutation();
+    const { data: apiBatchesRes } = useGetBatchesQuery(undefined);
+
+    const [students, setStudents] = useState<AttendanceStudent[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedBatch, setSelectedBatch] = useState<BatchFilter>(initialBatch);
+    const [selectedBatch, setSelectedBatch] = useState<string>(initialBatch);
     const [selectedStatusFilter, setSelectedStatusFilter] = useState<StatusFilter>('All');
 
-    // Date state (defaulting to Oct 16, 2026 as per designs)
-    const [selectedDate, setSelectedDate] = useState<Date>(() => new Date(2026, 9, 16));
+    // Dynamic batches list
+    const batchFilters = useMemo(() => {
+        const list = ['All batches'];
+        const sourceBatches = (reduxBatches && reduxBatches.length > 0)
+            ? reduxBatches
+            : (apiBatchesRes && Array.isArray(apiBatchesRes.data) ? apiBatchesRes.data : []);
+
+        sourceBatches.forEach((b: any) => {
+            const name = b.title || b.name;
+            if (name && !list.includes(name)) list.push(name);
+        });
+
+        students.forEach((s) => {
+            if (s.batch && s.batch !== 'All batches' && !list.includes(s.batch)) list.push(s.batch);
+        });
+        return list;
+    }, [reduxBatches, apiBatchesRes, students]);
+
+    // RTK Query backend integration
+    const { data: apiStudentsRes } = useGetStudentsQuery(undefined);
+
+    React.useEffect(() => {
+        if (apiStudentsRes && Array.isArray(apiStudentsRes.data)) {
+            const mapped: AttendanceStudent[] = apiStudentsRes.data.map((s: any) => ({
+                id: s._id || s.id,
+                name: s.name,
+                classGrade: s.classGrade || s.grade || '',
+                batch: s.batchName || s.batch || 'All batches',
+                status: s.attendanceStatus === 'Absent' ? 'Absent' : 'Present',
+                availableSubjects: s.subjects || [],
+                selectedSubjects: s.subjects || [],
+                isSubjectsExpanded: false,
+                phone: s.phone || '',
+                parentName: s.parentName || '',
+                feeAmount: s.feeAmount ? `₹${s.feeAmount}` : '₹0',
+                feeStatus: s.feeStatus || 'Paid',
+            }));
+            setStudents(mapped);
+        } else {
+            tuitionStorage.getStudents().then(persisted => {
+                if (persisted && persisted.length > 0) {
+                    const mapped: AttendanceStudent[] = persisted.map((s: any) => ({
+                        id: s.id,
+                        name: s.name,
+                        classGrade: s.classGrade || '',
+                        batch: s.batchName || 'All batches',
+                        status: 'Present',
+                        availableSubjects: s.subjects || [],
+                        selectedSubjects: s.subjects || [],
+                        isSubjectsExpanded: false,
+                        phone: s.phone || '',
+                        parentName: s.parentName || '',
+                        feeAmount: `₹${s.feeAmount || 0}`,
+                        feeStatus: s.feeStatus || 'Paid',
+                    }));
+                    setStudents(mapped);
+                }
+            });
+        }
+    }, [apiStudentsRes]);
+
+    // Date state
+    const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
     const [showExportModal, setShowExportModal] = useState(false);
 
     // Calendar Modal State
@@ -183,7 +156,7 @@ export default function Attendance({ route }: AttendanceProps) {
 
     // Date Text Formatter (e.g. "Today · 16 Oct 2026", "Yesterday · 15 Oct 2026", "Thu · 18 Oct 2026")
     const formatDateText = (date: Date): string => {
-        const today = new Date(2026, 9, 16);
+        const today = new Date();
         const isSameDay = (d1: Date, d2: Date) =>
             d1.getFullYear() === d2.getFullYear() &&
             d1.getMonth() === d2.getMonth() &&
@@ -316,12 +289,25 @@ export default function Attendance({ route }: AttendanceProps) {
     };
 
     // Save Attendance action
-    const handleSaveAttendance = () => {
-        const presentCount = students.filter((s) => s.status === 'Present').length;
-        showFlashMessage(
-            `Attendance saved: ${presentCount}/${students.length} present for ${formatDateText(selectedDate)}`,
-            'success'
-        );
+    const handleSaveAttendance = async () => {
+        const payload = {
+            date: selectedDate.toISOString(),
+            records: students.map((s) => ({
+                studentId: s.id,
+                status: s.status,
+                subjects: s.selectedSubjects,
+            })),
+        };
+
+        const res: any = await batchMarkAttendanceApi(payload);
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            const presentCount = students.filter((s) => s.status === 'Present').length;
+            ShowToast(res?.data?.message || `Attendance saved: ${presentCount}/${students.length} present for ${formatDateText(selectedDate)}`, "success");
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || "Failed to save attendance", "error");
+        }
     };
 
     // Link directly to StudentDetails
@@ -504,7 +490,7 @@ Sneha Iyer,Class 11,Morning Juniors,Absent,+91 98201 44321,Venkatesh Iyer,Overdu
                             showsHorizontalScrollIndicator={false}
                             contentContainerStyle={styles.filterPillsRow}
                         >
-                            {BATCH_FILTERS.map((batch) => {
+                            {batchFilters.map((batch) => {
                                 const isActive = selectedBatch === batch;
                                 return (
                                     <TouchableOpacity
@@ -775,10 +761,11 @@ Sneha Iyer,Class 11,Morning Juniors,Absent,+91 98201 44321,Venkatesh Iyer,Overdu
                                                 selectedDate.getMonth() === calendarMonth &&
                                                 selectedDate.getFullYear() === calendarYear;
 
+                                            const now = new Date();
                                             const isToday =
-                                                calendarYear === 2026 &&
-                                                calendarMonth === 9 &&
-                                                day === 16;
+                                                calendarYear === now.getFullYear() &&
+                                                calendarMonth === now.getMonth() &&
+                                                day === now.getDate();
 
                                             return (
                                                 <View key={`day-${day}`} style={styles.calendarDayCellWrapper}>
@@ -811,7 +798,7 @@ Sneha Iyer,Class 11,Morning Juniors,Absent,+91 98201 44321,Venkatesh Iyer,Overdu
                                         <TouchableOpacity
                                             activeOpacity={0.7}
                                             onPress={() => {
-                                                setSelectedDate(new Date(2026, 9, 16));
+                                                setSelectedDate(new Date());
                                                 setIsCalendarModalVisible(false);
                                             }}
                                             style={styles.todayQuickBtn}

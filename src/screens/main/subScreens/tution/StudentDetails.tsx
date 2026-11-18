@@ -17,7 +17,10 @@ import { font10, font12, font13, font14, font16, font18 } from '../../../../util
 import { resAvarage, resWidth } from '../../../../utils/responsive';
 import InsightHeader from '../components/InsightHeader';
 import { goBack } from '../../../../navigation/NavigationUtils';
-import { showFlashMessage } from '../../../../utils/flashMessage';
+import { ShowToast } from '../../../../utils/CustomToast/ToastManager';
+import { useRecordTuitionPaymentMutation } from '../../../../API';
+import { useAppDispatch } from '../../../../storage/redux/store';
+import { removeTuitionStudent } from '../../../../storage/redux/silce/TuitionSlice';
 import {
     StudentProfileCard,
     StudentFeeCard,
@@ -33,49 +36,32 @@ import { ExportColumn } from '../../../../services/exportService';
 import { importService } from '../../../../services/importService';
 
 export default function StudentDetails({ route }: any) {
+    const dispatch = useAppDispatch();
+    const [recordPaymentApi] = useRecordTuitionPaymentMutation();
     const student: StudentItem = route?.params?.student || {
-        id: '1',
-        name: 'Aman Kumar',
-        classGrade: 'Class 10',
-        parentName: 'Rekha Kumar',
-        phone: '99582 11870',
-        subjects: ['Mathematics', 'Physics'],
-        batchName: 'Evening Seniors',
-        batchTiming: '5:00 PM – 7:00 PM',
-        feeAmount: 2000,
+        id: '',
+        name: 'Student',
+        classGrade: '',
+        parentName: '',
+        phone: '',
+        subjects: [],
+        batchName: '',
+        batchTiming: '',
+        feeAmount: 0,
         feePeriod: 'month',
-        feeStatus: 'Overdue',
-        dueInfo: 'Next due 3 Oct',
+        feeStatus: 'Active',
+        dueInfo: '',
         attendanceStatus: 'Not marked',
         isActive: true,
     };
 
-    const initialFeeNum = Number(String(student.feeAmount).replace(/[^0-9]/g, '')) || 2000;
+    const initialFeeNum = Number(String(student.feeAmount).replace(/[^0-9]/g, '')) || 0;
 
-    const [feeStatus, setFeeStatus] = useState<string>(student.feeStatus || 'Overdue');
+    const [feeStatus, setFeeStatus] = useState<string>(student.feeStatus || 'Active');
     const [pendingAmount, setPendingAmount] = useState<number>(
         student.feeStatus === 'Paid' ? 0 : initialFeeNum
     );
-    const [paymentHistory, setPaymentHistory] = useState([
-        {
-            id: '1',
-            monthTitle: 'September 2026',
-            paidDetail: 'Paid 3 Sept · Cash',
-            amount: initialFeeNum,
-        },
-        {
-            id: '2',
-            monthTitle: 'August 2026',
-            paidDetail: 'Paid 3 Aug · Bank Transfer',
-            amount: initialFeeNum,
-        },
-        {
-            id: '3',
-            monthTitle: 'July 2026',
-            paidDetail: 'Paid 3 Jul · Cash',
-            amount: initialFeeNum,
-        },
-    ]);
+    const [paymentHistory, setPaymentHistory] = useState<any[]>((student as any).paymentHistory || []);
 
     const [isRemoveModalVisible, setIsRemoveModalVisible] = useState(false);
     const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
@@ -89,29 +75,48 @@ export default function StudentDetails({ route }: any) {
         setIsPaymentModalVisible(true);
     };
 
-    const handleConfirmPayment = () => {
+    const handleConfirmPayment = async () => {
         const amt = Number(paymentAmountInput) || initialFeeNum;
-        setFeeStatus('Paid');
-        setPendingAmount(0);
-        setPaymentHistory((prev) => [
-            {
-                id: String(Date.now()),
-                monthTitle: 'October 2026',
-                paidDetail: `Paid 16 Oct · ${paymentMode}`,
-                amount: amt,
-            },
-            ...prev,
-        ]);
-        setIsPaymentModalVisible(false);
-        showFlashMessage(
-            `Payment of ₹${amt.toLocaleString('en-IN')} for ${student.name} recorded successfully!`,
-            'success'
-        );
+        const payload = {
+            amount: amt,
+            paymentMode,
+            date: new Date().toISOString(),
+        };
+
+        const res: any = await recordPaymentApi({
+            studentId: String(student.id),
+            body: payload,
+        });
+
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || `Payment of ₹${amt.toLocaleString('en-IN')} recorded!`, 'success');
+
+            setFeeStatus('Paid');
+            setPendingAmount(0);
+            setPaymentHistory((prev) => [
+                {
+                    id: String(res?.data?.data?._id || Date.now()),
+                    monthTitle: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
+                    paidDetail: `Paid ${new Date().getDate()} ${new Date().toLocaleString('default', { month: 'short' })} · ${paymentMode}`,
+                    amount: amt,
+                },
+                ...prev,
+            ]);
+            setIsPaymentModalVisible(false);
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to record payment', 'error');
+            return;
+        }
     };
 
     const handleConfirmRemove = () => {
         setIsRemoveModalVisible(false);
-        showFlashMessage(`Student "${student.name}" removed successfully`, 'success');
+        if (student?.id) {
+            dispatch(removeTuitionStudent(student.id));
+        }
+        ShowToast(`Student "${student.name}" removed successfully`, 'success');
         goBack();
     };
 
@@ -182,11 +187,11 @@ export default function StudentDetails({ route }: any) {
                 <StudentProfileCard
                     name={student.name}
                     classGrade={student.classGrade}
-                    sinceDate="15 Jun 2026"
+                    sinceDate={(student as any).startDate ? new Date((student as any).startDate).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB')}
                     parentName={student.parentName}
                     batchName={student.batchName}
                     batchTiming={student.batchTiming}
-                    batchDays="Mon, Wed, Fri"
+                    batchDays={(student as any).batchDays || ''}
                     phone={student.phone}
                     subjects={student.subjects}
                 />
@@ -196,10 +201,10 @@ export default function StudentDetails({ route }: any) {
                     monthlyFee={student.feeAmount}
                     feeStatus={feeStatus}
                     lastPaidAmount={initialFeeNum}
-                    lastPaidDate={feeStatus === 'Paid' ? '16 Oct 2026' : '3 Sept 2026'}
-                    nextDueDate={feeStatus === 'Paid' ? '3 Nov 2026' : '3 Oct 2026'}
+                    lastPaidDate={feeStatus === 'Paid' ? new Date().toLocaleDateString('en-GB') : (student as any).lastPaidDate || 'N/A'}
+                    nextDueDate={student.dueInfo || 'Due soon'}
                     pendingAmount={pendingAmount}
-                    overdueDays={feeStatus === 'Overdue' ? 12 : 0}
+                    overdueDays={feeStatus === 'Overdue' ? 1 : 0}
                     onPressRecordPayment={handleRecordPayment}
                 />
 
@@ -208,10 +213,10 @@ export default function StudentDetails({ route }: any) {
 
                 {/* 4. Attendance Calendar Section */}
                 <StudentAttendanceCalendar
-                    initialMonth={9}
-                    initialYear={2026}
-                    paidDates={['2026-07-03', '2026-08-03', '2026-09-03', '2026-10-03']}
-                    upcomingDueDates={['2026-10-20', '2026-11-03']}
+                    initialMonth={new Date().getMonth()}
+                    initialYear={new Date().getFullYear()}
+                    paidDates={[]}
+                    upcomingDueDates={[]}
                 />
 
                 {/* 5. Study History Section */}

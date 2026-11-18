@@ -12,6 +12,7 @@ import CustomInput from "../../ui/components/CustomInput"
 import { useAppDispatch } from "../../utils/hooks"
 import { setCurrentUser, setCurrentUserEmail, setCurrentProfileName, setCurrentProfileImage, setAppPurpose, setIsPremium } from "../../storage/redux/silce/AuthSlice"
 import { subscriptionService } from "../../services/subscriptionService"
+import { useLoginMutation, extractApiErrorMessage } from "../../API"
 import LinearGradient from "react-native-linear-gradient"
 import Lock from "../../assets/images/icons/password.svg"
 import Log from "../../assets/images/icons/login.svg"
@@ -19,7 +20,6 @@ import { ShowToast } from "../../utils/CustomToast/ToastManager"
 import { masterQuery, switchUserDatabase } from "../../storage/local/sqlite"
 import AsyncStorageUtils from "../../utils/storage"
 import { loginOneSignalUser } from "../../services/oneSignalService"
-import { syncNotifications } from "../../services/localNotificationService"
 import Svg, { Path, Rect } from 'react-native-svg'
 
 const MailIcon = (props: any) => (
@@ -35,6 +35,7 @@ export const Login = () => {
     const { flow } = route.params || {}
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
+    const [loginApi, { isLoading: isLoggingIn }] = useLoginMutation()
 
     useEffect(() => {
         if (flow) {
@@ -54,33 +55,76 @@ export const Login = () => {
 
         try {
             const cleanQuery = email.trim().toLowerCase();
-            const user = masterQuery(
-                "SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1",
-                [cleanQuery, cleanQuery]
-            );
+            let token: string | null = null;
+            let loggedUser: any = null;
 
-            if (!user || user.length === 0) {
-                ShowToast("Account not found with this email", "error");
+            // Attempt backend API login
+            const res: any = await loginApi({ email: cleanQuery, password });
+            if (res?.data?.success || (res?.data && !res?.error)) {
+                console.log("res -----", res);
+                token = res.data?.data?.token || res.data?.token;
+                loggedUser = res.data?.data?.user || res.data?.user;
+                if (token) {
+                    await AsyncStorageUtils.setItem('token', token);
+                }
+            } else {
+                console.log("res error -----", res);
+                ShowToast(res?.error?.data?.message || res?.data?.message || "Invalid credentials", "error");
                 return;
             }
 
-            if (user[0].password !== password) {
-                ShowToast("Incorrect password", "error");
-                return;
-            }
+            let username = loggedUser?.username || loggedUser?.id || cleanQuery;
+            let displayName = loggedUser?.fullName || userRecordName(cleanQuery);
+            let profileImage = loggedUser?.profileImage || null;
+            let appPurpose = loggedUser?.appPurpose || 'local';
+            let isPremium = Boolean(loggedUser?.isPremium);
 
-            const username = user[0].username || cleanQuery;
+            // If backend didn't return user, fallback to local SQLite
+            if (!loggedUser) {
+                const localUser = masterQuery(
+                    "SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1",
+                    [cleanQuery, cleanQuery]
+                );
+
+                if (!localUser || localUser.length === 0) {
+                    ShowToast("Account not found with this email", "error");
+                    return;
+                }
+
+                if (localUser[0].password !== password) {
+                    ShowToast("Incorrect password", "error");
+                    return;
+                }
+
+                username = localUser[0].username || cleanQuery;
+                displayName = localUser[0].display_name || localUser[0].username;
+                profileImage = localUser[0].profile_image || null;
+                appPurpose = localUser[0].app_purpose || 'local';
+                isPremium = Boolean(localUser[0].is_premium);
+            } else {
+                // Keep local SQLite master cache in sync
+                try {
+                    const localExists = masterQuery("SELECT id FROM users WHERE LOWER(email) = ?", [cleanQuery]);
+                    if (!localExists || localExists.length === 0) {
+                        masterQuery(
+                            "INSERT INTO users (username, email, password, display_name, app_purpose, is_premium) VALUES (?, ?, ?, ?, ?, ?)",
+                            [username, cleanQuery, password, displayName, appPurpose, isPremium ? 1 : 0]
+                        );
+                    }
+                } catch (e) {}
+            }
 
             // Switch to user database
             switchUserDatabase(username);
 
             const userSession = {
                 username: username,
-                email: user[0].email || cleanQuery,
-                displayName: user[0].display_name || user[0].username,
-                profileImage: user[0].profile_image || null,
-                appPurpose: user[0].app_purpose || 'local',
-                isPremium: Boolean(user[0].is_premium),
+                email: cleanQuery,
+                displayName: displayName,
+                profileImage: profileImage,
+                appPurpose: appPurpose,
+                isPremium: isPremium,
+                token: token,
             };
 
             // Save session to local storage
@@ -95,17 +139,20 @@ export const Login = () => {
             dispatch(setIsPremium(userSession.isPremium));
             subscriptionService.init(userSession.isPremium, userSession.appPurpose);
 
-            // Sync services
-            loginOneSignalUser(userSession.username);
-            syncNotifications();
+            // Identify user with OneSignal
+            loginOneSignalUser(userSession.username, userSession.email);
 
             ShowToast("Logged in successfully", "success");
             navigate("BottomTab");
         } catch (e) {
             console.error("Login error:", e);
-            ShowToast("Failed to log in", "error");
+            ShowToast(extractApiErrorMessage(e, "Failed to log in"), "error");
         }
     };
+
+    function userRecordName(emailStr: string) {
+        return emailStr.split('@')[0] || 'User';
+    }
 
     return (
         <View style={styles.main} >
@@ -154,7 +201,14 @@ export const Login = () => {
                             </TouchableOpacity>
                         </View>
                         <View>
-                            <CustomButton onPress={handleLogin} style={{ marginBottom: resAvarage(3) }} title={"Sign in"} Sufix={Log} />
+                            <CustomButton 
+                                loading={isLoggingIn}
+                                disabled={isLoggingIn}
+                                onPress={handleLogin} 
+                                style={{ marginBottom: resAvarage(3) }} 
+                                title={"Sign in"} 
+                                Sufix={Log} 
+                            />
                             <CustomText style={styles.account} >
                                 {"Don't have an account?" + "  "}
                                 <CustomText onPress={() => navigate("Signup")} style={[styles.account, styles.highlight]}>

@@ -24,7 +24,6 @@ import { useAppDispatch } from '../../../utils/hooks';
 import { setCurrentUser, setCurrentProfileName, setCurrentProfileImage } from '../../../storage/redux/silce/AuthSlice';
 import AsyncStorageUtils from '../../../utils/storage';
 import { logoutOneSignalUser } from '../../../services/oneSignalService';
-import { cancelAllLocalNotifications } from '../../../services/localNotificationService';
 import { resetAndNavigate } from '../../../navigation/NavigationUtils';
 
 export default function More() {
@@ -54,9 +53,8 @@ export default function More() {
             // Clear user session from storage
             await AsyncStorageUtils.removeItem('user_session');
 
-            // Call OneSignal and local notifications logout/clear
+            // Call OneSignal logout
             logoutOneSignalUser();
-            await cancelAllLocalNotifications();
 
             // Clear Redux state
             dispatch(setCurrentUser(null));

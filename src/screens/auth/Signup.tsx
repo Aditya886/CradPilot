@@ -11,6 +11,7 @@ import CustomInput from "../../ui/components/CustomInput"
 import { useAppDispatch } from "../../utils/hooks"
 import { setCurrentUser, setCurrentUserEmail, setCurrentProfileName, setCurrentProfileImage, setAppPurpose, setIsPremium, AppPurpose } from "../../storage/redux/silce/AuthSlice"
 import { subscriptionService } from "../../services/subscriptionService"
+import { useSendSignupOtpMutation, useVerifySignupMutation, extractApiErrorMessage } from "../../API"
 import Down from "../../assets/images/icons/down.svg"
 import Check from "../../assets/images/icons/check.svg"
 import LinearGradient from "react-native-linear-gradient"
@@ -21,7 +22,6 @@ import { ShowToast } from "../../utils/CustomToast/ToastManager"
 import { masterQuery, masterInsert, switchUserDatabase } from "../../storage/local/sqlite"
 import AsyncStorageUtils from "../../utils/storage"
 import { loginOneSignalUser } from "../../services/oneSignalService"
-import { syncNotifications } from "../../services/localNotificationService"
 import Svg, { Path, Rect } from 'react-native-svg'
 
 const MailIcon = (props: any) => (
@@ -43,9 +43,11 @@ export const Signup = () => {
 
     // OTP verification states
     const [otp, setOtp] = useState("")
-    const [generatedOtp, setGeneratedOtp] = useState("")
     const [timer, setTimer] = useState(45)
     const otpInputRef = useRef<TextInput>(null)
+
+    const [sendOtpApi, { isLoading: isSendingOtp }] = useSendSignupOtpMutation()
+    const [verifySignupApi, { isLoading: isVerifyingSignup }] = useVerifySignupMutation()
 
     const purposeOptions: { id: AppPurpose; title: string; subtitle: string; badge: string }[] = [
         {
@@ -84,7 +86,7 @@ export const Signup = () => {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim());
     };
 
-    const handleSendOtp = () => {
+    const handleSendOtp = async () => {
         if (!name.trim()) {
             ShowToast("Please enter your name", "error");
             return;
@@ -102,38 +104,68 @@ export const Signup = () => {
             return;
         }
 
+        const cleanEmail = email.trim().toLowerCase();
+
+        // 1. Check local SQLite duplicate
+        const existing = masterQuery("SELECT id FROM users WHERE LOWER(email) = ? OR LOWER(username) = ?", [cleanEmail, cleanEmail]);
+        if (existing && existing.length > 0) {
+            ShowToast("An account with this email already exists", "error");
+            return;
+        }
+
         try {
-            const cleanEmail = email.trim().toLowerCase();
-            const existing = masterQuery("SELECT id FROM users WHERE LOWER(email) = ? OR LOWER(username) = ?", [cleanEmail, cleanEmail]);
-            if (existing && existing.length > 0) {
-                ShowToast("An account with this email already exists", "error");
+            // Send OTP via Backend API
+            const res: any = await sendOtpApi({
+                email: cleanEmail,
+                password,
+                fullName: name.trim(),
+                appPurpose: purpose,
+            });
+
+            if (res?.data?.success || (res?.data && !res?.error)) {
+                console.log("res -----", res);
+                setOtp("");
+                setStep(2);
+                setTimer(45);
+                ShowToast(res?.data?.message || `Verification code sent to ${cleanEmail}`, "success");
+
+                setTimeout(() => {
+                    otpInputRef.current?.focus();
+                }, 300);
+            } else {
+                console.log("res error -----", res);
+                ShowToast(res?.error?.data?.message || res?.data?.message || "Failed to send verification code", "error");
                 return;
             }
-
-            // Generate 6-digit OTP code
-            const code = Math.floor(100000 + Math.random() * 900000).toString();
-            setGeneratedOtp(code);
-            setOtp("");
-            setStep(2);
-            setTimer(45);
-            ShowToast(`Verification code sent to ${cleanEmail}`, "info");
-
-            setTimeout(() => {
-                otpInputRef.current?.focus();
-            }, 300);
         } catch (e) {
             console.error("OTP send error:", e);
             ShowToast("Failed to initiate verification", "error");
         }
     };
 
-    const handleResendOtp = () => {
+    const handleResendOtp = async () => {
         if (timer > 0) return;
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        setGeneratedOtp(code);
-        setTimer(45);
-        setOtp("");
-        ShowToast(`New verification code sent to ${email.trim()}`, "info");
+        const cleanEmail = email.trim().toLowerCase();
+        try {
+            const res: any = await sendOtpApi({
+                email: cleanEmail,
+                password,
+                fullName: name.trim(),
+                appPurpose: purpose,
+            });
+
+            if (res?.data?.success || (res?.data && !res?.error)) {
+                console.log("res -----", res);
+                ShowToast(res?.data?.message || `New verification code sent to ${cleanEmail}`, "success");
+                setTimer(45);
+                setOtp("");
+            } else {
+                console.log("res error -----", res);
+                ShowToast(res?.error?.data?.message || res?.data?.message || "Failed to resend code", "error");
+            }
+        } catch (e: any) {
+            ShowToast(extractApiErrorMessage(e, "Failed to resend code"), "error");
+        }
     };
 
     const handleVerifyAndCreateAccount = async () => {
@@ -143,18 +175,34 @@ export const Signup = () => {
             return;
         }
 
-        // Accept the generated code or universal test code 123456
-        if (cleanOtp !== generatedOtp && cleanOtp !== '123456') {
-            ShowToast("Invalid verification code. Please check and try again.", "error");
+        const cleanEmail = email.trim().toLowerCase();
+        let token: string | null = null;
+        let createdUser: any = null;
+
+        // Try backend verification
+        const res: any = await verifySignupApi({
+            email: cleanEmail,
+            otp: cleanOtp,
+        });
+
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            token = res.data?.data?.token || res.data?.token;
+            createdUser = res.data?.data?.user || res.data?.user;
+            if (token) {
+                await AsyncStorageUtils.setItem('token', token);
+            }
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || "Invalid verification code. Please check and try again.", "error");
             return;
         }
 
         try {
-            const cleanEmail = email.trim().toLowerCase();
             const rawPrefix = cleanEmail.split('@')[0].replace(/[^a-z0-9_]/g, '') || `user_${Date.now()}`;
-            let finalUsername = rawPrefix;
+            let finalUsername = createdUser?.id || rawPrefix;
 
-            // Ensure username uniqueness
+            // Ensure username uniqueness locally
             const checkU = masterQuery("SELECT id FROM users WHERE username = ?", [finalUsername]);
             if (checkU && checkU.length > 0) {
                 finalUsername = `${rawPrefix}_${Math.floor(Math.random() * 900) + 100}`;
@@ -182,6 +230,7 @@ export const Signup = () => {
                 profileImage: null,
                 appPurpose: purpose,
                 isPremium: false,
+                token: token,
             };
 
             // Save session to storage
@@ -196,15 +245,14 @@ export const Signup = () => {
             dispatch(setIsPremium(false));
             subscriptionService.init(false, purpose);
 
-            // Sync notifications and OneSignal
-            loginOneSignalUser(userSession.username);
-            syncNotifications();
+            // Identify user in OneSignal
+            loginOneSignalUser(userSession.username, userSession.email);
 
             ShowToast("Account verified and created successfully!", "success");
             navigate("BottomTab");
         } catch (e) {
             console.error("Account creation error:", e);
-            ShowToast("Failed to create account", "error");
+            ShowToast(extractApiErrorMessage(e, "Failed to create account"), "error");
         }
     };
 
@@ -345,6 +393,8 @@ export const Signup = () => {
 
                                 <View style={{ marginTop: resAvarage(2) }}>
                                     <CustomButton
+                                        loading={isSendingOtp}
+                                        disabled={isSendingOtp}
                                         onPress={handleSendOtp}
                                         style={{ marginBottom: resAvarage(3) }}
                                         title={"Continue to Verification"}
@@ -376,21 +426,6 @@ export const Signup = () => {
                                         <CustomText style={styles.emailPillText}>{email.trim()}</CustomText>
                                     </View>
                                 </View>
-
-                                {/* Demo Helper Autofill Card */}
-                                <TouchableOpacity
-                                    activeOpacity={0.8}
-                                    onPress={() => setOtp(generatedOtp)}
-                                    style={styles.demoCard}
-                                >
-                                    <View style={styles.demoCardLeft}>
-                                        <CustomText style={styles.demoCardTitle}>Verification Code</CustomText>
-                                        <CustomText style={styles.demoCardCode}>{generatedOtp}</CustomText>
-                                    </View>
-                                    <View style={styles.demoCardButton}>
-                                        <CustomText style={styles.demoCardButtonText}>Tap to autofill</CustomText>
-                                    </View>
-                                </TouchableOpacity>
 
                                 {/* 6-Digit OTP Box Grid */}
                                 <View style={styles.otpSection}>
@@ -444,6 +479,8 @@ export const Signup = () => {
 
                                 <View style={{ marginTop: resAvarage(2) }}>
                                     <CustomButton
+                                        loading={isVerifyingSignup}
+                                        disabled={isVerifyingSignup}
                                         onPress={handleVerifyAndCreateAccount}
                                         style={{ marginBottom: resAvarage(3) }}
                                         title={"Verify & Create Account"}
@@ -521,49 +558,6 @@ const styles = StyleSheet.create({
     emailPillText: {
         fontFamily: FontBold,
         fontSize: font14,
-        color: colors.black,
-    },
-    demoCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: scaleSize(12),
-        paddingHorizontal: resAvarage(2.5),
-        paddingVertical: resAvarage(2),
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderWidth: 1.5,
-        borderColor: colors.theme,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-    },
-    demoCardLeft: {
-        gap: resAvarage(0.3),
-    },
-    demoCardTitle: {
-        fontSize: font11,
-        fontFamily: FontMedium,
-        color: colors.black60,
-        textTransform: 'uppercase',
-        letterSpacing: resAvarage(0.1),
-    },
-    demoCardCode: {
-        fontSize: font24,
-        fontFamily: FontBold,
-        letterSpacing: scaleSize(4),
-        color: colors.black,
-    },
-    demoCardButton: {
-        backgroundColor: colors.theme,
-        paddingHorizontal: resAvarage(2),
-        paddingVertical: resAvarage(1),
-        borderRadius: scaleSize(8),
-    },
-    demoCardButtonText: {
-        fontSize: font12,
-        fontFamily: FontBold,
         color: colors.black,
     },
     otpSection: {

@@ -92,13 +92,13 @@ const MainStackNavigator = () => {
           >
             {renderContent()}
             <GlobalToast ref={toastRef} />
-            {/* <Toast config={toastConfig} /> */}
+            <Toast config={toastConfig} />
           </KeyboardAvoidingView>
         ) : (
           <View style={{ flex: 1, backgroundColor: colors.bgColor }}>
             {renderContent()}
             <GlobalToast ref={toastRef} />
-            {/* <Toast config={toastConfig} /> */}
+            <Toast config={toastConfig} />
           </View>
         )}
       </SafeAreaView>

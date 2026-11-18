@@ -25,6 +25,10 @@ import {
 } from './components/TuitionIcons';
 import { tuitionStorage } from '../../../../services/tuitionStorage';
 import { subscriptionService } from '../../../../services/subscriptionService';
+import { useCreateStudentMutation, useGetBatchesQuery, extractApiErrorMessage } from '../../../../API';
+import { ShowToast } from '../../../../utils/CustomToast/ToastManager';
+import { useAppDispatch, useAppSelector } from '../../../../API/hooks/ReduxHooks';
+import { setTuitionBatches, addTuitionStudent } from '../../../../storage/redux/silce/TuitionSlice';
 
 const SUGGESTED_SUBJECTS = [
     'Mathematics',
@@ -36,34 +40,11 @@ const SUGGESTED_SUBJECTS = [
     'Hindi',
 ];
 
-interface BatchOption {
+export interface BatchOption {
     id: string;
     title: string;
     subtitle: string;
 }
-
-const BATCH_OPTIONS: BatchOption[] = [
-    {
-        id: 'no_batch',
-        title: 'No batch',
-        subtitle: 'Individual timing',
-    },
-    {
-        id: 'morning_juniors',
-        title: 'Morning Juniors',
-        subtitle: '7:00 AM – 8:30 AM · Mon – Sat',
-    },
-    {
-        id: 'evening_seniors',
-        title: 'Evening Seniors',
-        subtitle: '5:00 PM – 7:00 PM · Mon, Wed, Fri',
-    },
-    {
-        id: 'board_prep',
-        title: 'Board Prep',
-        subtitle: '7:30 PM – 9:00 PM · Tue, Thu, Sat',
-    },
-];
 
 const MONTH_NAMES = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -78,12 +59,62 @@ const MONTH_NAMES_FULL = [
 const SHORT_WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export default function AddStudent() {
+    const dispatch = useAppDispatch();
+    const reduxBatches = useAppSelector(state => state.tuition.batches);
+    const [createStudentApi] = useCreateStudentMutation();
+    const { data: apiBatchesRes } = useGetBatchesQuery(undefined);
+
+    // Sync batches into Redux
+    React.useEffect(() => {
+        if (apiBatchesRes && Array.isArray(apiBatchesRes.data)) {
+            const mappedBatches = apiBatchesRes.data.map((b: any) => ({
+                id: String(b._id || b.id),
+                title: b.title || b.name,
+                timing: b.timing || '',
+                days: b.days || '',
+                classRange: b.classRange || (b.grades?.join(' – ') || ''),
+                studentsCount: b.studentsCount || (Array.isArray(b.students) ? b.students.length : 0),
+            }));
+            dispatch(setTuitionBatches(mappedBatches));
+        }
+    }, [apiBatchesRes, dispatch]);
+
+    // Dynamic Batch Options from Redux / API
+    const batchOptions: BatchOption[] = React.useMemo(() => {
+        const list: BatchOption[] = [
+            {
+                id: 'no_batch',
+                title: 'No batch',
+                subtitle: 'Individual timing',
+            },
+        ];
+
+        const sourceBatches = (reduxBatches && reduxBatches.length > 0)
+            ? reduxBatches
+            : (apiBatchesRes && Array.isArray(apiBatchesRes.data) ? apiBatchesRes.data : []);
+
+        sourceBatches.forEach((b: any) => {
+            const bId = String(b._id || b.id);
+            if (bId && bId !== 'no_batch') {
+                list.push({
+                    id: bId,
+                    title: b.title || b.name,
+                    subtitle: b.timing ? `${b.timing}${b.days ? ' · ' + b.days : ''}` : (b.days || 'Scheduled timing'),
+                });
+            }
+        });
+
+        return list;
+    }, [reduxBatches, apiBatchesRes]);
+
+    const today = new Date();
+
     // 1. Student Information State
     const [studentName, setStudentName] = useState('');
     const [classGrade, setClassGrade] = useState('');
     const [parentName, setParentName] = useState('');
     const [parentPhone, setParentPhone] = useState('');
-    const [startDate, setStartDate] = useState<Date>(() => new Date(2026, 9, 16));
+    const [startDate, setStartDate] = useState<Date>(() => new Date());
 
     // 2. Subjects State
     const [customSubjectInput, setCustomSubjectInput] = useState('');
@@ -95,14 +126,18 @@ export default function AddStudent() {
     // 4. Tuition Fee State
     const [feePeriod, setFeePeriod] = useState<'Monthly' | 'Semester'>('Monthly');
     const [feeAmount, setFeeAmount] = useState('');
-    const [firstDueDate, setFirstDueDate] = useState<Date>(() => new Date(2026, 9, 16));
-    const [semesterEndDate, setSemesterEndDate] = useState<Date>(() => new Date(2027, 3, 16));
+    const [firstDueDate, setFirstDueDate] = useState<Date>(() => new Date());
+    const [semesterEndDate, setSemesterEndDate] = useState<Date>(() => {
+        const d = new Date();
+        d.setMonth(d.getMonth() + 6);
+        return d;
+    });
 
     // Calendar Modal State (shared between startDate, firstDueDate, and semesterEndDate)
     const [isCalendarModalVisible, setIsCalendarModalVisible] = useState(false);
     const [calendarTarget, setCalendarTarget] = useState<'start' | 'due' | 'semesterEnd'>('start');
-    const [calendarMonth, setCalendarMonth] = useState<number>(9); // Oct
-    const [calendarYear, setCalendarYear] = useState<number>(2026);
+    const [calendarMonth, setCalendarMonth] = useState<number>(today.getMonth());
+    const [calendarYear, setCalendarYear] = useState<number>(today.getFullYear());
 
     const formatDisplayDate = (d: Date) => {
         const day = String(d.getDate()).padStart(2, '0');
@@ -177,47 +212,74 @@ export default function AddStudent() {
     };
 
     // Add Student Submit Handler
-    const handleAddStudent = () => {
+    const handleAddStudent = async () => {
         if (!studentName.trim()) {
-            showFlashMessage('Please enter student name', 'error');
+            ShowToast('Please enter student name', 'error');
             return;
         }
         if (!classGrade.trim()) {
-            showFlashMessage('Please enter student class', 'error');
+            ShowToast('Please enter student class', 'error');
             return;
         }
 
         const check = subscriptionService.canAddEntry();
         if (!check.allowed) {
+            ShowToast('Free storage limit reached. Please upgrade to Pro.', 'error');
             return;
         }
 
-        const selectedBatch = BATCH_OPTIONS.find((b) => b.id === selectedBatchId);
+        const selectedBatch = batchOptions.find((b) => b.id === selectedBatchId);
+        const parsedFee = parseFloat(feeAmount) || 0;
 
-        tuitionStorage.addOrUpdateStudent({
-            id: String(Date.now()),
+        const payload: any = {
             name: studentName.trim(),
             classGrade: classGrade.trim(),
             parentName: parentName.trim() || 'Parent of ' + studentName.trim(),
-            phone: parentPhone.trim() || '+91 98765 43210',
+            phone: parentPhone.trim() || undefined,
             subjects: selectedSubjects.length > 0 ? selectedSubjects : ['General'],
-            batchName: selectedBatch?.title || 'Morning Juniors',
-            batchTiming: selectedBatch?.subtitle?.split('·')[0]?.trim() || '7:00 AM – 8:30 AM',
-            feeAmount: parseFloat(feeAmount) || 1500,
+            batchId: selectedBatch && selectedBatch.id !== 'no_batch' ? selectedBatch.id : undefined,
+            batchName: selectedBatch && selectedBatch.id !== 'no_batch' ? selectedBatch.title : 'No batch',
+            batchTiming: selectedBatch && selectedBatch.id !== 'no_batch' ? selectedBatch.subtitle : 'Individual timing',
+            feeAmount: parsedFee,
             feePeriod: feePeriod.toLowerCase(),
-            feeStatus: 'Due Soon',
-            dueInfo: `Next due ${firstDueDate.getDate()} ${MONTH_NAMES[firstDueDate.getMonth()]}`,
-            attendanceStatus: 'Not marked',
-            isActive: true,
-        });
+            startDate: startDate.toISOString(),
+            firstDueDate: firstDueDate.toISOString(),
+        };
 
-        showFlashMessage(
-            `Student "${studentName.trim()}" added to ${selectedBatch?.title || 'batch'}!`,
-            'success'
-        );
+        const res: any = await createStudentApi(payload);
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || `Student "${studentName.trim()}" enrolled successfully!`, "success");
 
-        // Navigate back or to Students
-        goBack();
+            const enrolledStudent = {
+                id: String(res?.data?.data?._id || res?.data?.data?.id || Date.now()),
+                name: studentName.trim(),
+                classGrade: classGrade.trim(),
+                parentName: parentName.trim() || 'Parent of ' + studentName.trim(),
+                phone: parentPhone.trim() || '',
+                subjects: selectedSubjects.length > 0 ? selectedSubjects : ['General'],
+                batchName: selectedBatch && selectedBatch.id !== 'no_batch' ? selectedBatch.title : 'No batch',
+                batchTiming: selectedBatch && selectedBatch.id !== 'no_batch' ? selectedBatch.subtitle : 'Individual timing',
+                feeAmount: parsedFee,
+                feePeriod: feePeriod.toLowerCase(),
+                feeStatus: 'Due Soon',
+                dueInfo: `Next due ${firstDueDate.getDate()} ${MONTH_NAMES[firstDueDate.getMonth()]}`,
+                attendanceStatus: 'Not marked',
+                isActive: true,
+            };
+
+            // Update Redux
+            dispatch(addTuitionStudent(enrolledStudent));
+
+            // Persist locally
+            tuitionStorage.addOrUpdateStudent(enrolledStudent);
+
+            goBack();
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || "An error occurred", "error");
+            return;
+        }
     };
 
     // Calendar Calculations
@@ -388,7 +450,7 @@ export default function AddStudent() {
                         <CustomText style={styles.sectionHeader}>BATCH & TIMING</CustomText>
 
                         <View style={styles.batchOptionsList}>
-                            {BATCH_OPTIONS.map((batch) => {
+                            {batchOptions.map((batch) => {
                                 const isSelected = selectedBatchId === batch.id;
                                 return (
                                     <TouchableOpacity
@@ -601,10 +663,11 @@ export default function AddStudent() {
                                                 activeCalendarDate.getMonth() === calendarMonth &&
                                                 activeCalendarDate.getFullYear() === calendarYear;
 
+                                            const now = new Date();
                                             const isToday =
-                                                calendarYear === 2026 &&
-                                                calendarMonth === 9 &&
-                                                day === 16;
+                                                calendarYear === now.getFullYear() &&
+                                                calendarMonth === now.getMonth() &&
+                                                day === now.getDate();
 
                                             return (
                                                 <View key={`day-${day}`} style={styles.calendarDayCellWrapper}>
@@ -637,7 +700,7 @@ export default function AddStudent() {
                                         <TouchableOpacity
                                             activeOpacity={0.7}
                                             onPress={() => {
-                                                const today = new Date(2026, 9, 16);
+                                                const today = new Date();
                                                 if (calendarTarget === 'start') {
                                                     setStartDate(today);
                                                 } else if (calendarTarget === 'due') {

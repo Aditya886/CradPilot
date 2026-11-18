@@ -14,9 +14,9 @@ interface TuitionTotalCardProps {
 }
 
 export default function TuitionTotalCard({
-    totalFeeCollected = 26100,
-    pendingAmount = 16500,
-    activeStudents = 6,
+    totalFeeCollected = 0,
+    pendingAmount = 0,
+    activeStudents = 0,
 }: TuitionTotalCardProps) {
     return (
         <View style={styles.card}>

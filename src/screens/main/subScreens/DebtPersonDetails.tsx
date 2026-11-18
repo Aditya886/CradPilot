@@ -17,7 +17,6 @@ import DeleteIcon from '../../../assets/images/icons/delete.svg';
 import Toast from 'react-native-toast-message';
 import DeleteConfirmationModal from '../../../ui/modals/DeleteConfirmationModal';
 import AddDebtTxnModal from '../../../ui/modals/AddDebtTxnModal';
-import { syncNotifications } from '../../../services/localNotificationService';
 
 export default function DebtPersonDetails({ route }: any) {
     const { personId } = route?.params;
@@ -99,7 +98,6 @@ export default function DebtPersonDetails({ route }: any) {
                 text2: 'Transaction removed successfully.',
             });
             loadPersonDetails();
-            syncNotifications();
         } catch (error) {
             console.error('Failed to delete transaction:', error);
             Toast.show({
@@ -118,7 +116,6 @@ export default function DebtPersonDetails({ route }: any) {
         try {
             removeWhere('debt_transactions', 'person_id = ?', [personId]);
             remove('debt_persons', personId);
-            syncNotifications();
             Toast.show({
                 type: 'success',
                 text1: 'Deleted',

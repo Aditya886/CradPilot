@@ -20,13 +20,13 @@ interface StudentFeeCardProps {
 }
 
 export default function StudentFeeCard({
-    monthlyFee = 2000,
-    feeStatus = 'Overdue',
-    lastPaidAmount = 2000,
-    lastPaidDate = '3 Sept 2026',
-    nextDueDate = '3 Oct 2026',
-    pendingAmount = 2000,
-    overdueDays = 12,
+    monthlyFee = 0,
+    feeStatus = 'Active',
+    lastPaidAmount = 0,
+    lastPaidDate = 'N/A',
+    nextDueDate = 'Due soon',
+    pendingAmount = 0,
+    overdueDays = 0,
     onPressRecordPayment,
 }: StudentFeeCardProps) {
     const isOverdue = feeStatus === 'Overdue';

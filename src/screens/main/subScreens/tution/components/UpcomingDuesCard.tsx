@@ -23,39 +23,8 @@ interface UpcomingDuesCardProps {
     onPressAddPayment?: (item: DueItem) => void;
 }
 
-const DEFAULT_DUES: DueItem[] = [
-    {
-        id: '1',
-        name: 'Sneha Iyer',
-        dueDate: 'Due 15 Sept',
-        amount: 10000,
-        status: 'Overdue',
-    },
-    {
-        id: '2',
-        name: 'Aman Kumar',
-        dueDate: 'Due 3 Oct',
-        amount: 2000,
-        status: 'Overdue',
-    },
-    {
-        id: '3',
-        name: 'Rahul Sharma',
-        dueDate: 'Due 17 Oct',
-        amount: 1500,
-        status: 'Due Soon',
-    },
-    {
-        id: '4',
-        name: 'Kabir Singh',
-        dueDate: 'Due 20 Oct',
-        amount: 1200,
-        status: 'Due Soon',
-    },
-];
-
 export default function UpcomingDuesCard({
-    dues = DEFAULT_DUES,
+    dues = [],
     onPressSeeAll,
     onPressItem,
     onPressAddPayment,

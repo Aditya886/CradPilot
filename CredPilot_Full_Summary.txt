@@ -1,0 +1,490 @@
+================================================================================
+CREDPILOT — COMPLETE APPLICATION SUMMARY & UI SPECIFICATION
+================================================================================
+
+This document contains two comprehensive sections:
+  - SECTION 1: DETAILED TECHNICAL & FUNCTIONAL ARCHITECTURE SUMMARY
+  - SECTION 2: UI SCREENS & FEATURES SPECIFICATION (SCREEN-BY-SCREEN DEEP BREAKDOWN)
+
+================================================================================
+SECTION 1: DETAILED TECHNICAL & FUNCTIONAL ARCHITECTURE SUMMARY
+================================================================================
+
+1. EXECUTIVE OVERVIEW
+---------------------
+CredPilot is a high-performance, offline-first mobile application built for Android and iOS using React Native (TypeScript). It delivers a unified financial, credit ledger, and operational management ecosystem. Rather than offering a one-size-fits-all interface, CredPilot uniquely reconfigures its UI, navigation flows, and quick-action toolbars based on three specialized App Purpose profiles:
+  - Type 1: Local (Personal & Social Ledger — Debts, Trips, and Savings)
+  - Type 2: Finance (Financial Planning & Loans — Cash Flow, EMIs, and Savings)
+  - Type 3: Tuition (Education & Coaching Hub — Students, Batches, Attendance, Fees)
+
+2. CORE TECHNOLOGY STACK
+------------------------
+  - Framework: React Native (Bare Workflow 0.74+, TypeScript)
+  - Local Database: react-native-quick-sqlite (High-performance JSI SQLite)
+  - Local Cache / Session: @react-native-async-storage/async-storage
+  - State Management: Redux Toolkit (@reduxjs/toolkit) + React-Redux
+  - Networking & Cloud API: RTK Query (createApi, fetchBaseQuery) connecting to Node.js/Express REST APIs
+  - Push Notifications: OneSignal Native SDK v5 (react-native-onesignal)
+  - UI & Graphics: react-native-svg, react-native-linear-gradient, react-native-popup-menu
+  - Navigation: React Navigation (Native Stack + Bottom Tabs + Drawer)
+  - Data Interoperability: Custom CSV Tabular Parser & Serializer (exportService, importService)
+
+3. SYSTEM ARCHITECTURE & OFFLINE-FIRST PHILOSOPHY
+-------------------------------------------------
+CredPilot is engineered with an offline-first foundation:
+  - Dual-Database Strategy:
+      a) master.db: Handles global auth caching, registered users, and active session pointers.
+      b) user_<username>.db: Isolated per-user database dynamically created upon login to store all local transactions, debts, goals, and offline copies of student/loan records.
+  - Zero-Latency UI:
+      Screens immediately populate from local SQLite tables or Redux cached slices. In the background, RTK Query synchronizes state with the cloud API.
+  - Standardized Non-Throwing Mutation Lifecycle:
+      Every mutation (API call) follows a strict pattern that avoids swallowing errors:
+      ```ts
+      const res: any = await someMutationApi(payload);
+      if (res?.data?.success || (res?.data && !res?.error)) {
+          console.log("res -----", res);
+          ShowToast(res?.data?.message || "Success", "success");
+          // Update Redux, sync local SQLite, navigate or close modal
+      } else {
+          console.log("res error -----", res);
+          ShowToast(res?.error?.data?.message || res?.data?.message || "An error occurred", "error");
+          return;
+      }
+      ```
+
+4. THE THREE APP PURPOSE PROFILES (TYPES) & WORKFLOWS
+-----------------------------------------------------
+
+  TYPE 1: LOCAL (PERSONAL & SOCIAL LEDGER)
+  - Purpose: Designed for individuals, roommates, friends, and everyday consumers managing personal bookkeeping.
+  - Active Sections on Home / Bottom Nav:
+      * Debts & Credit Ledger (Udhar Khata)
+      * Plans & Trips Budgeting
+      * Savings & Goals
+  - Bottom Tab '+' Quick Action Menu:
+      * Add Debt Person (Register a contact for borrowing/lending)
+      * Record Debt Transaction (Log incoming or outgoing cash)
+      * Create Plan / Trip (Initialize a travel or event budget)
+      * Add Savings Goal (Create a target milestone)
+
+  TYPE 2: FINANCE (FINANCIAL PLANNING & LOANS)
+  - Purpose: Designed for salaried professionals, borrowers, freelancers, and investors managing formal debt obligations.
+  - Active Sections on Home / Bottom Nav:
+      * Finance Overview & Cash Flow (Income vs Expense)
+      * EMI & Loans Tracker
+      * Savings & Goals
+  - Bottom Tab '+' Quick Action Menu:
+      * Add Loan / EMI (Register home, auto, personal, or education loan)
+      * Record Loan Payment (Log monthly installment with interest/principal split)
+      * Add Savings Goal (Create a financial target)
+
+  TYPE 3: TUITION (EDUCATION & COACHING HUB)
+  - Purpose: Designed for independent tutors, private coaching institutes, and teachers managing students and cash collections.
+  - Active Sections on Home / Bottom Nav:
+      * Tuition Center Dashboard (Collections, Dues, Student count)
+      * Students Directory & Statements
+      * Batch Scheduler & Teacher Leaves
+      * Attendance Roll-Call Register
+      * Pending Fees Center
+  - Bottom Tab '+' Quick Action Menu:
+      * Enroll Student (Name, grade, subjects, batch, parent contact, fees)
+      * Create Batch (Title, class range, days, timings)
+      * Mark Attendance (Roll call by batch and subjects)
+      * Record Fee Payment (Log tuition fee receipt via Cash, UPI, or Bank)
+
+5. CROSS-CUTTING SUBSYSTEMS
+---------------------------
+  - Authentication: JWT Bearer Token, 6-digit email OTP dispatch and verification, encrypted session persistence, password reset pipeline.
+  - Insights Engine: Consolidates metrics across all sections to compute overall Net Worth, Profit/Loss, Cash Inflow vs Outflow, and section-specific graphs.
+  - Pro & Subscription Service: Controls feature tiering (Free vs Pro) such as maximum student limits, advanced CSV statement exports, and deep analytics.
+  - Dynamic More Drawer: Ensures navigation cleanliness by detecting which section is active on the Home tab and automatically hiding it from the More drawer listing while keeping alternative sections easily accessible.
+
+
+================================================================================
+SECTION 2: UI SCREENS & FEATURES SPECIFICATION (SCREEN-BY-SCREEN DEEP BREAKDOWN)
+================================================================================
+
+--------------------------------------------------------------------------------
+1. AUTHENTICATION & ONBOARDING SCREENS
+--------------------------------------------------------------------------------
+
+1.1 Splash Screen (`src/screens/auth/Splash.tsx`)
+  - Purpose: Initial application bootstrapper.
+  - UI Elements:
+      * CredPilot animated brand logo and typography.
+      * Background gradient matching theme palette.
+  - Features & Logic:
+      * Checks AsyncStorage for existing `user_session` and valid JWT token.
+      * Initializes user SQLite database (`switchUserDatabase`).
+      * Auto-routes to `BottomTab` if logged in, or redirects to `Slider` (first launch) / `Login`.
+
+1.2 Onboarding Slider (`src/screens/auth/Slider.tsx`)
+  - Purpose: Introduces new users to CredPilot's capabilities.
+  - UI Elements:
+      * 3 swipeable slides highlighting: Debts Ledger, EMI & Loan Tracking, Tuition Management.
+      * Dot pagination indicators.
+      * 'Get Started' and 'Skip' buttons.
+  - Features & Logic:
+      * Navigates to `Signup` on completion or `Login` via header link.
+
+1.3 Login Screen (`src/screens/auth/Login.tsx`)
+  - Purpose: Returning user authentication.
+  - UI Elements:
+      * Email input field with regex format validation.
+      * Password input field with toggleable show/hide eye icon.
+      * 'Forgot Password?' navigation text link.
+      * 'Sign In' primary gradient button.
+      * 'Don't have an account? Sign Up' bottom footer link.
+  - Features & Logic:
+      * Invokes `useLoginMutation`. On success, saves JWT token in `AsyncStorage`, populates Redux `authSlice`, initializes isolated SQLite user DB, registers user with OneSignal, and navigates to `BottomTab`.
+      * Displays precise backend validation errors via `ShowToast`.
+
+1.4 Sign Up Screen (`src/screens/auth/Signup.tsx`)
+  - Purpose: New account creation with Purpose profiling and OTP validation.
+  - UI Elements (Two-Step Flow):
+      * Step 1:
+          - Full Name text input.
+          - Email address input.
+          - Password & Confirm Password inputs.
+          - App Purpose selector cards (3 selectable tiles: Local, Finance, Tuition).
+          - 'Continue' button.
+      * Step 2 (Verification Modal / State):
+          - 6-digit OTP individual input boxes with auto-focus.
+          - 45-second countdown timer.
+          - 'Resend Code' button (active after timer expires).
+          - 'Verify & Create Account' button.
+  - Features & Logic:
+      * Calls `useSendSignupOtpMutation` on step 1 submission.
+      * Calls `useVerifySignupMutation` on step 2 with entered OTP.
+      * Upon verification, seeds local database, configures initial purpose, registers session, and logs user in directly.
+
+1.5 Forgot Password Screen (`src/screens/auth/ForgotPassword.tsx`)
+  - Purpose: Secure self-service password recovery via email OTP.
+  - UI Elements (Three-Step Flow):
+      * Step 1: Registered email input + 'Send Reset Code' button.
+      * Step 2: 6-digit OTP code entry + 45s resend timer + 'Verify Code' button.
+      * Step 3: New Password and Confirm Password inputs + 'Reset Password' button.
+  - Features & Logic:
+      * Validates inputs, sends verification OTP through `useSendForgotPasswordOtpMutation`, verifies OTP and resets credentials via `useVerifyResetPasswordMutation`.
+      * Redirects user back to `Login` upon successful password update.
+
+--------------------------------------------------------------------------------
+2. CORE NAVIGATION & BOTTOM TAB SHELL
+--------------------------------------------------------------------------------
+
+2.1 Bottom Tab Navigator (`src/navigation/BottomTab.tsx`)
+  - Purpose: Global persistent navigation bar at the bottom of the app.
+  - Tab 1: Home (Adaptive based on user purpose: Local / Finance / Tuition).
+  - Tab 2: Primary Section Tab:
+      * In Local Mode: Debts (Udhar ledger).
+      * In Finance Mode: Finance (Cash flow & loan overview).
+      * In Tuition Mode: Tuition Center (Class & fee center).
+  - Tab 3: Insights (Cross-sectional financial intelligence & analytics).
+  - Tab 4: More (Unified settings, drawer, and secondary modules).
+  - Central Quick Action '+' Button:
+      * Floating elevated circular button.
+      * Opens a dynamic Bottom Sheet Menu presenting only relevant actions for the active user mode.
+
+--------------------------------------------------------------------------------
+3. HOME SCREENS (DYNAMIC BY USER PURPOSE)
+--------------------------------------------------------------------------------
+
+3.1 Home Screen (`src/screens/main/bottomTabs/Home.tsx`)
+  - Adaptive rendering based on `appPurpose`:
+
+  A. In Local Purpose:
+      - Header: Greeting, User avatar, Active Profile badge, Notification bell.
+      - Debts Overview Card: Total amount you will get (green) vs amount you owe (red).
+      - Plans & Trips Card: Active trips, total budget, spent amount, progress bar.
+      - Savings & Goals Card: Saved amount vs Target, circular completion percentage.
+      - Recent Activity List: Latest incoming/outgoing debts and trip transactions.
+
+  B. In Finance Purpose:
+      - Total Balance & Cash Flow Card: Inflows, Outflows, Net balance.
+      - Upcoming EMI Card: Next due EMI amount, loan name, due date countdown.
+      - Active Loans Summary: Total active loans count and combined principal debt.
+      - Recent Payments List: Last 5 loan installments logged.
+
+  C. In Tuition Purpose:
+      - Tuition Header Stats: Total Monthly Collections, Total Pending Fees.
+      - Active Students Card: Enrolled count, attendance percentage.
+      - Immediate Dues List: Urgent student fee dues with quick payment buttons.
+      - Quick Actions Row: Shortcuts to Students, Batches, Attendance, Fees.
+
+--------------------------------------------------------------------------------
+4. LOCAL MODE MODULES & SCREENS
+--------------------------------------------------------------------------------
+
+4.1 Debts & Credit Ledger Screen (`src/screens/main/bottomTabs/Debts.tsx`)
+  - Purpose: Comprehensive ledger for personal lending and borrowing.
+  - UI Elements:
+      * Segmented Filter Bar: 'People' tab vs 'Activity' tab.
+      * Overall Summary Banner: Total You Will Get (green) | Total You Will Pay (red) | Net Balance.
+      * Search Bar: Instant contact lookup by name or phone.
+      * Sorting Chips: Sort by amount, name, or recent date.
+      * People List: Contact cards showing avatar initials, contact name, last transaction date, and net outstanding amount.
+      * Header Actions: CSV Export / Import button, Add Person icon.
+  - Features & Logic:
+      * Pulls live records from `DebtsApi` and SQLite `borrowers` / `debt_transactions` tables.
+      * Tapping a contact opens `DebtPersonDetails`.
+
+4.2 Debt Person Details Screen (`src/screens/main/subScreens/DebtPersonDetails.tsx`)
+  - Purpose: Full ledger and transaction history for an individual contact.
+  - UI Elements:
+      * Contact Profile Header: Name, phone number, net balance status tag.
+      * Quick WhatsApp Button: Generates pre-formatted reminder text with amount and UPI ID.
+      * Transaction History List: Itemized list showing date, incoming/outgoing badge, amount, and notes.
+      * Bottom Action Bar:
+          - 'You Gave' (Red button — logs cash lent).
+          - 'You Got' (Green button — logs cash received).
+          - 'Settle Balance' button (clears outstanding balance to zero).
+      * Export Statement Button: Exports this contact's ledger to CSV/PDF.
+  - Features & Logic:
+      * Uses `AddDebtTxnModal` to record new transactions via `useRecordDebtTxnMutation`.
+
+4.3 Plans & Trips Screen (`src/screens/main/subScreens/PlanTrip.tsx`)
+  - Purpose: Group travel and personal project budget planner.
+  - UI Elements:
+      * Total Plans Budget Card: Combined budget of all active plans vs total spent.
+      * Plan Type Filter Chips: 'All', 'Group Trips', 'Single Plans'.
+      * Plan Cards List:
+          - Trip Title (e.g. "Goa Vacation").
+          - Tag (Group vs Single).
+          - Total Budget, Amount Spent, Remaining Budget.
+          - Visual linear progress indicator.
+          - Number of members involved and expense items logged.
+      * 'Create Plan / Trip' Floating Button / Header Action.
+      * CSV Export / Import Modal.
+  - Features & Logic:
+      * Powered by `PlansApi` (`useGetPlansQuery`, `useCreatePlanMutation`).
+      * Tapping a plan navigates to `TripDetails`.
+
+4.4 Trip Details Screen (`src/screens/main/subScreens/TripDetails.tsx`)
+  - Purpose: In-depth expense splitting and settlement breakdown for a trip.
+  - UI Elements:
+      * Trip Header: Destination/Title, total budget, spend burn-rate meter.
+      * Members Carousel: Avatars of all participants with individual spend breakdown.
+      * Who Owes Whom Settlement Matrix: Automatically calculated cross-settlement recommendations.
+      * Itemized Spends List: Date, expense title (e.g. "Hotel Booking"), amount, paid-by tag.
+      * 'Add Expense' Floating Button: Opens modal to log item, amount, payer, and category.
+      * 'Delete Plan' option in header menu.
+
+4.5 Savings & Goals Screen (`src/screens/main/subScreens/savingAndGoals/SavingAndGoalsScreen.tsx`)
+  - Purpose: Visual savings target and milestone tracker.
+  - UI Elements:
+      * Summary Banner: Total Saved across all goals vs Combined Target, Circular Progress Meter.
+      * Filter Toggle: 'Active Goals' vs 'Completed Goals'.
+      * Goal Cards:
+          - Goal Icon & Title (e.g. "Buy MacBook Pro", "Emergency Fund").
+          - Target Amount, Current Saved Amount, Remaining Amount.
+          - Target Completion Date with calendar days left indicator.
+          - 'Add Amount' button (logs new saved contribution).
+          - 'Mark Done' checkmark toggle.
+          - 'Delete Goal' trash icon.
+      * 'New Goal' primary button.
+  - Features & Logic:
+      * Powered by `GoalsApi` (`useGetGoalsQuery`, `useUpdateGoalMutation`, `useDeleteGoalMutation`).
+      * Uses `NewGoalModal`, `AddAmountModal`, and `AddContributionModal`.
+
+--------------------------------------------------------------------------------
+5. FINANCE MODE MODULES & SCREENS
+--------------------------------------------------------------------------------
+
+5.1 Finance Overview Section (`src/screens/main/subScreens/FinanceSection.tsx`)
+  - Purpose: Central dashboard for financial accounts, cashflow, and loan liabilities.
+  - UI Elements:
+      * Total Wealth / Balance Card with monthly cashflow trend.
+      * Income vs Expense bar comparisons.
+      * Active Loans Widget: Outstanding debt total, next upcoming EMI card.
+      * Recent Loan Payments List.
+      * Quick Links: EMI & Loans, Savings & Goals, Financial Calculator.
+
+5.2 EMI & Loans Screen (`src/screens/main/subScreens/emiLoans/EmiLoansScreen.tsx`)
+  - Purpose: Comprehensive tracker for formal loans and recurring EMIs.
+  - UI Elements:
+      * Aggregate Summary Card: Total Loan Amount | Total Outstanding | Combined Monthly EMI.
+      * Filter Tabs: 'All Loans', 'Personal', 'Home', 'Vehicle', 'Education'.
+      * Loan Cards:
+          - Bank/Lender Name and Loan Type.
+          - Total Loan Amount, Remaining Balance, Interest Rate (%).
+          - Monthly EMI Amount, Due Date countdown badge.
+          - Progress Bar (% repaid).
+      * 'Add Loan' primary action button.
+  - Features & Logic:
+      * Powered by `EmiApi` (`useGetEmiLoansQuery`, `useCreateEmiLoanMutation`).
+      * Tapping a card opens `EmiLoanDetailScreen`.
+
+5.3 EMI Loan Detail Screen (`src/screens/main/subScreens/emiLoans/EmiLoanDetailScreen.tsx`)
+  - Purpose: Full amortization, payment logging, and closure management for a loan.
+  - UI Elements:
+      * Loan Status Header: Lender, account number, status (Active/Closed).
+      * Principal vs Interest Split Cards: Total principal paid vs interest paid to date.
+      * Amortization Schedule Table: Complete month-by-month breakdown of upcoming EMIs.
+      * Action Buttons:
+          - 'Mark EMI Paid' (Logs current month's installment, recalculates principal balance).
+          - 'Undo Last EMI' (Reverts inadvertent payment entry).
+          - 'Foreclose Loan' (Calculates total settlement amount and marks loan closed).
+          - 'Delete Loan' (Removes loan record from system).
+
+--------------------------------------------------------------------------------
+6. TUITION MODE MODULES & SCREENS
+--------------------------------------------------------------------------------
+
+6.1 Tuition Center Dashboard (`src/screens/main/subScreens/tution/TutionSection.tsx`)
+  - Purpose: Main hub for tutoring businesses and coaching centers.
+  - UI Elements:
+      * Total Collections Card: Month-to-date fees collected vs pending dues.
+      * Monthly Performance Stats: Collection rate percentage, active student count.
+      * Quick Action Shortcuts (4 large interactive tiles):
+          - Students Directory
+          - Batch Schedules
+          - Roll-Call Attendance
+          - Pending Fees
+      * Upcoming Dues Carousel: Students with fees due in the next 7 days.
+      * Export / Import Center Button.
+
+6.2 Students Directory Screen (`src/screens/main/subScreens/tution/Students.tsx`)
+  - Purpose: Searchable, filterable roster of all enrolled students.
+  - UI Elements:
+      * Search Input: Instant filter matching student name, parent name, phone, or class.
+      * Batch Filter Dropdown: Dynamically populated from active batches in Redux/API.
+      * Status Filter Pills: 'All', 'Active', 'Fee Pending', 'Fee Paid', 'Overdue'.
+      * Sort Selector: Sort by Name, Due Date, Fee Amount, Class.
+      * Student Cards List:
+          - Student Name, Class/Grade badge.
+          - Batch Name and Scheduled Timing.
+          - Monthly Fee Amount and Status Tag (Green = Paid, Yellow = Due Soon, Red = Overdue).
+          - Due Date indicator.
+      * 'Enroll New Student' floating action button.
+      * Statement Export & Import Modal.
+  - Features & Logic:
+      * Connected to `TuitionApi` (`useGetStudentsQuery`, `useGetBatchesQuery`) and Redux `TuitionSlice`.
+
+6.3 Add Student Screen (`src/screens/main/subScreens/tution/AddStudent.tsx`)
+  - Purpose: New student registration form.
+  - UI Elements:
+      * Student Information Section:
+          - Student Full Name input.
+          - Class / Grade input.
+          - Parent / Guardian Name input.
+          - Parent Phone Number input.
+          - Start Date picker (custom in-modal interactive calendar).
+      * Subject Selection Section:
+          - Predefined subject chips (Mathematics, Science, English, Physics, etc.).
+          - Custom subject input with 'Add' button.
+      * Batch & Timing Section:
+          - Dynamically loaded batch cards fetched from API/Redux.
+          - 'No Batch / Individual Timing' fallback option.
+      * Tuition Fee Section:
+          - Fee Billing Period selector: Monthly vs Semester.
+          - Fee Amount (₹) numeric input.
+          - First Due Date picker (custom in-modal interactive calendar).
+      * 'Enroll Student' primary button.
+  - Features & Logic:
+      * Validates inputs, calls `createStudentApi`, checks success, dispatches to Redux store (`addTuitionStudent`), updates local storage, and returns.
+
+6.4 Student Details Screen (`src/screens/main/subScreens/tution/StudentDetails.tsx`)
+  - Purpose: Comprehensive 360-degree student profile and fee ledger.
+  - UI Elements:
+      * Profile Card: Name, class, enrollment date, parent name, batch timing, phone.
+      * Monthly Fee Card: Current status (Paid/Overdue), monthly fee, pending amount, 'Record Payment' button.
+      * Payment History Section: Itemized historical payments with payment mode (Cash/UPI/Bank) and date.
+      * Attendance Calendar Section: Visual monthly calendar marking student present, absent, or holiday.
+      * Study History Section: Classes attended, subjects covered, teacher notes.
+      * 'Export Statement' Button: Exports complete student ledger to CSV/PDF.
+      * 'Remove Student' Danger Button: Triggers confirmation modal and deletes student from system.
+
+6.5 Batch Management Screen (`src/screens/main/subScreens/tution/Batch.tsx`)
+  - Purpose: Master schedule management for classes and teacher availability.
+  - UI Elements:
+      * Active Batches List:
+          - Batch Title (e.g. "Morning Juniors", "Board Prep").
+          - Timing and Days of the Week.
+          - Grade range (e.g. "Class 9 – 10").
+          - Student enrollment count badge.
+          - Reschedule badge (if currently operating on an altered timing).
+      * 'Create Batch' Button & Modal:
+          - Title, Class Range, Timing, Days selection, Room/Notes.
+      * 'Reschedule Batch' Modal:
+          - Single-day emergency shift vs permanent timetable change.
+          - New timing input, Date selector, Reschedule reason.
+      * 'Teacher Leave' Modal:
+          - Target batch, Leave type (Absent/Emergency/Holiday), Leave date, Reason.
+
+6.6 Attendance Register Screen (`src/screens/main/subScreens/tution/Attendance.tsx`)
+  - Purpose: Daily roll-call attendance register for coaching classes.
+  - UI Elements:
+      * Date Selector Bar: Today, Yesterday, or custom date picked via interactive calendar modal.
+      * Batch Filter Carousel: Filter students by selected batch.
+      * Attendance Roll-Call List:
+          - Student Name and Class.
+          - Quick Status Toggle Buttons: [P] Present (Green) | [A] Absent (Red) | [H] Holiday (Gray).
+          - Multi-subject tag selector for students taking multiple classes in one session.
+      * 'Save Attendance' primary footer button.
+  - Features & Logic:
+      * Submits batch attendance using `useBatchMarkAttendanceMutation`.
+
+6.7 Pending Fees Center Screen (`src/screens/main/subScreens/tution/PendingFees.tsx`)
+  - Purpose: Dedicated accounts receivable tracking for overdue tuition fees.
+  - UI Elements:
+      * Metrics Header: Total Pending Amount (₹) | Total Students with Dues.
+      * Category Filter Tabs: 'All Pending', 'This Month', 'Last Month', 'Overdue'.
+      * Pending Fee Cards:
+          - Student Name and Class.
+          - Fee Amount Pending.
+          - Days Overdue badge (e.g. "Overdue by 12 days").
+          - 'Collect Fee' button.
+      * Record Payment Modal:
+          - Payment amount, Date, Mode of payment (Cash, UPI, Bank Transfer).
+
+--------------------------------------------------------------------------------
+7. CROSS-PURPOSE & UTILITY SCREENS
+--------------------------------------------------------------------------------
+
+7.1 Insights & Analytics Screen (`src/screens/main/subScreens/Insights.tsx`)
+  - Purpose: Unified financial intelligence and profit/loss analytics.
+  - UI Elements:
+      * Macro Metrics Header: Total Net Worth, Overall Profit/Loss status, Total Assets vs Liabilities.
+      * Cash Flow Bar Chart: Monthly comparison of inflows vs outflows.
+      * Sectional Breakdown Tabs:
+          - Debts: Total lent vs total borrowed volume, top debtor.
+          - Plans & Trips: Total budget allocated vs actual expenditure variance.
+          - Tuition: Collection efficiency rate (Collected vs Target), default rate.
+          - EMI & Loans: Remaining debt liability vs total principal paid.
+          - Savings: Average savings rate, progress towards goals.
+
+7.2 More Drawer Hub Screen (`src/screens/main/bottomTabs/More.tsx`)
+  - Purpose: System drawer, profile settings, and secondary module access.
+  - UI Elements:
+      * User Profile Card: Avatar, Display Name, Email, App Purpose badge, Edit Profile button.
+      * Switch App Purpose Card: Quickly toggle active mode between Local, Finance, and Tuition.
+      * Dynamic Module List:
+          - Displays modules NOT currently on the Home tab (e.g. if in Local mode, Tuition and EMI Loans appear here).
+          - Pro Badge / Subscription Tile: Current status (Free vs Pro), upgrade trigger.
+      * Utilities & Tools:
+          - Data Backup & CSV Export / Import Center.
+          - Notifications Settings.
+          - Security & App Lock.
+      * Help & Legal: Terms of Service, Privacy Policy, Version details.
+      * 'Logout' Action with confirmation modal.
+
+7.3 Edit Profile Screen (`src/screens/main/subScreens/EditProfile.tsx`)
+  - Purpose: Manage personal account details and application preference.
+  - UI Elements:
+      * Profile photo uploader with camera/gallery selector.
+      * Full Name text input.
+      * Email address display (read-only/verified).
+      * Primary App Purpose dropdown selector.
+      * 'Save Changes' primary button.
+
+7.4 Web View Screen (`src/screens/main/subScreens/WebViewScreen.tsx`)
+  - Purpose: Displays in-app terms, policies, or external web links without leaving the application.
+  - UI Elements:
+      * Navigation header with back button and page title.
+      * Progress loading bar.
+      * Native WebView renderer.
+
+================================================================================
+END OF SPECIFICATION
+================================================================================
+

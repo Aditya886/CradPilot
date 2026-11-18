@@ -17,53 +17,8 @@ interface StudentStudyHistoryProps {
     records?: StudyRecord[];
 }
 
-const DEFAULT_RECORDS: StudyRecord[] = [
-    {
-        id: '1',
-        date: '14 Oct 2026',
-        detail: 'Physics',
-        status: 'Present',
-    },
-    {
-        id: '2',
-        date: '13 Oct 2026',
-        detail: 'Mathematics',
-        status: 'Present',
-    },
-    {
-        id: '3',
-        date: '12 Oct 2026',
-        detail: 'Physics',
-        status: 'Present',
-    },
-    {
-        id: '4',
-        date: '10 Oct 2026',
-        detail: 'Reason: Family Function',
-        status: 'Absent',
-    },
-    {
-        id: '5',
-        date: '9 Oct 2026',
-        detail: 'Mathematics',
-        status: 'Present',
-    },
-    {
-        id: '6',
-        date: '8 Oct 2026',
-        detail: 'Physics',
-        status: 'Present',
-    },
-    {
-        id: '7',
-        date: '2 Oct 2026',
-        detail: 'Teacher Absent (Gandhi Jayanti)',
-        status: 'Holiday',
-    },
-];
-
 export default function StudentStudyHistory({
-    records = DEFAULT_RECORDS,
+    records = [],
 }: StudentStudyHistoryProps) {
     return (
         <View style={styles.wrapper}>

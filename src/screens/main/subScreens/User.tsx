@@ -14,8 +14,11 @@ import { useFocusEffect } from '@react-navigation/native'
 import { navigate, goBack } from '../../../navigation/NavigationUtils'
 import DeleteConfirmationModal from '../../../ui/modals/DeleteConfirmationModal'
 import { calculateExpectedInterest } from '../../../utils/FormatUtil'
+import { useDeleteBorrowerMutation } from '../../../API'
+import { ShowToast } from '../../../utils/CustomToast/ToastManager'
 
 export default function User({ route }: any) {
+    const [deleteBorrowerApi] = useDeleteBorrowerMutation()
     const { data: initialData } = route?.params
     const [borrowerData, setBorrowerData] = useState(initialData)
     const [loans, setLoans] = useState<any[]>([])
@@ -122,9 +125,15 @@ export default function User({ route }: any) {
         }
     }
 
-    const handleDeleteUser = () => {
-        try {
-            if (borrowerData?.id) {
+    const handleDeleteUser = async () => {
+        if (!borrowerData?.id) return;
+
+        const res: any = await deleteBorrowerApi(String(borrowerData.id));
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || 'Borrower deleted successfully', 'info');
+
+            try {
                 const borrowerLoans = query('SELECT id FROM loans WHERE borrower_id = ?', [borrowerData.id]);
                 const loanIds = borrowerLoans.map((l: any) => l.id);
                 if (loanIds.length > 0) {
@@ -133,10 +142,16 @@ export default function User({ route }: any) {
                     query('DELETE FROM loans WHERE borrower_id = ?', [borrowerData.id]);
                 }
                 query('DELETE FROM borrowers WHERE id = ?', [borrowerData.id]);
+            } catch (e) {
+                console.error("Error deleting borrower from SQLite:", e);
             }
+
+            setShowDeleteUserModal(false);
             goBack();
-        } catch (e) {
-            console.error("Error deleting borrower:", e);
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to delete borrower', 'error');
+            return;
         }
     };
 

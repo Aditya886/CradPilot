@@ -15,8 +15,9 @@ import ButtonSlider from '../../../ui/components/ButtonSlider'
 import { PieChart } from 'react-native-gifted-charts'
 import { insert, getWhere } from '../../../storage/local/sqlite'
 import CalendarModal from '../../../ui/modals/CalendarModal'
-import { syncNotifications } from '../../../services/localNotificationService'
 import { subscriptionService } from '../../../services/subscriptionService'
+import { useCreateLoanMutation, useCreateBorrowerMutation } from '../../../API'
+import { ShowToast } from '../../../utils/CustomToast/ToastManager'
 
 // Svg components
 import Svg, { Rect, Path } from 'react-native-svg';
@@ -28,6 +29,8 @@ const CalendarIcon = (props: any) => (
 );
 
 export default function NewLoan({ route }: any) {
+    const [createLoanApi] = useCreateLoanMutation();
+    const [createBorrowerApi] = useCreateBorrowerMutation();
     const prefilledBorrower = route?.params?.borrower;
 
     // Borrower Info
@@ -168,55 +171,77 @@ export default function NewLoan({ route }: any) {
         };
     }, [amount, rate, ratePeriod, interestType, compoundFreq, repaymentMethod, term]);
 
-    const handleCreateLoan = () => {
+    const handleCreateLoan = async () => {
         if (!name.trim() || !phone.trim() || !amount.trim()) {
+            ShowToast('Please fill all required fields', 'error');
             return;
         }
 
         const check = subscriptionService.canAddEntry();
         if (!check.allowed) {
+            ShowToast('Storage limit reached. Please upgrade to Pro.', 'error');
             return;
         }
 
-        try {
-            // Find or create borrower
-            let borrower = getWhere('borrowers', 'phone = ?', [phone.trim()])[0];
-            let borrowerId;
-            if (!borrower) {
-                insert('borrowers', {
-                    name: name.trim(),
-                    phone: phone.trim(),
-                    address: address.trim() || null
+        const principalAmount = parseFloat(amount.replace(/[^0-9.]/g, '')) || 0;
+
+        const payload = {
+            name: name.trim(),
+            phone: phone.trim(),
+            address: address.trim() || undefined,
+            title: description.trim() || `${name}'s Loan`,
+            amount: principalAmount,
+            rate: parseFloat(rate) || 0,
+            ratePeriod,
+            interestType,
+            repaymentMethod,
+            term: repaymentMethod === 'Installments' ? parseInt(term, 10) : undefined,
+            loanDate: loanDate ? new Date(loanDate.split('/').reverse().join('-')).toISOString() : new Date().toISOString(),
+            dueDate: dueDate ? new Date(dueDate.split('/').reverse().join('-')).toISOString() : undefined,
+        };
+
+        const res: any = await createLoanApi(payload);
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || 'Loan created successfully!', 'success');
+
+            try {
+                // Find or create borrower in SQLite
+                let borrower = getWhere('borrowers', 'phone = ?', [phone.trim()])[0];
+                let borrowerId;
+                if (!borrower) {
+                    insert('borrowers', {
+                        name: name.trim(),
+                        phone: phone.trim(),
+                        address: address.trim() || null
+                    });
+                    borrower = getWhere('borrowers', 'phone = ?', [phone.trim()])[0];
+                }
+                borrowerId = borrower?.id || 1;
+
+                insert('loans', {
+                    borrower_id: borrowerId,
+                    title: description.trim() || `${name}'s Loan`,
+                    amount: principalAmount,
+                    description: description.trim() || null,
+                    loan_date: loanDate,
+                    due_date: dueDate || null,
+                    rate: parseFloat(rate) || 0,
+                    rate_period: ratePeriod,
+                    interest_type: interestType,
+                    compound_freq: (interestType === 'Compound' || (interestType === 'Reducing' && repaymentMethod === 'Flexible')) ? compoundFreq : null,
+                    interest_applied: interestApplied,
+                    repayment_method: repaymentMethod,
+                    term: repaymentMethod === 'Installments' ? parseInt(term, 10) : null,
+                    status: 'Active'
                 });
-                borrower = getWhere('borrowers', 'phone = ?', [phone.trim()])[0];
-            }
-            borrowerId = borrower.id;
-
-            const principalAmount = parseFloat(amount.replace(/[^0-9.]/g, '')) || 0;
-
-            insert('loans', {
-                borrower_id: borrowerId,
-                title: description.trim() || `${name}'s Loan`,
-                amount: principalAmount,
-                description: description.trim() || null,
-                loan_date: loanDate,
-                due_date: dueDate || null,
-                rate: parseFloat(rate) || 0,
-                rate_period: ratePeriod,
-                interest_type: interestType,
-                compound_freq: (interestType === 'Compound' || (interestType === 'Reducing' && repaymentMethod === 'Flexible')) ? compoundFreq : null,
-                interest_applied: interestApplied,
-                repayment_method: repaymentMethod,
-                term: repaymentMethod === 'Installments' ? parseInt(term, 10) : null,
-                status: 'Active'
-            });
-
-            // Sync scheduled notifications
-            syncNotifications();
+            } catch (err) {}
 
             goBack();
-        } catch (error) {
-            console.error('Error creating loan:', error);
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to create loan', 'error');
+            return;
         }
     };
 

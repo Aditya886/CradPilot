@@ -28,6 +28,8 @@ import ExportImportModal from '../../../../ui/modals/ExportImportModal';
 import { ExportColumn } from '../../../../services/exportService';
 import { importService } from '../../../../services/importService';
 import { tuitionStorage } from '../../../../services/tuitionStorage';
+import { useGetPendingFeesQuery, useRecordTuitionPaymentMutation } from '../../../../API';
+import { ShowToast } from '../../../../utils/CustomToast/ToastManager';
 
 type FilterType = 'all' | 'this_month' | 'last_month' | 'overdue';
 
@@ -43,72 +45,37 @@ const FILTER_OPTIONS: FilterOption[] = [
     { id: 'overdue', label: 'Overdue' },
 ];
 
-const INITIAL_PENDING_STUDENTS: PendingStudentItem[] = [
-    {
-        id: '1',
-        name: 'Sneha Iyer',
-        classGrade: 'Class 11',
-        feeAmount: 10000,
-        dueFormatted: 'Due 15 Sept',
-        statusType: 'overdue',
-        daysText: 'Overdue by 31 days',
-        category: 'last_month',
-    },
-    {
-        id: '2',
-        name: 'Aman Kumar',
-        classGrade: 'Class 10',
-        feeAmount: 2000,
-        dueFormatted: 'Due 3 Oct',
-        statusType: 'overdue',
-        daysText: 'Overdue by 13 days',
-        category: 'this_month',
-    },
-    {
-        id: '3',
-        name: 'Rahul Sharma',
-        classGrade: 'Class 8',
-        feeAmount: 1500,
-        dueFormatted: 'Due 17 Oct',
-        statusType: 'due_soon',
-        daysText: 'Due in 1 days',
-        category: 'this_month',
-    },
-    {
-        id: '4',
-        name: 'Kabir Singh',
-        classGrade: 'Class 6',
-        feeAmount: 1200,
-        dueFormatted: 'Due 20 Oct',
-        statusType: 'due_soon',
-        daysText: 'Due in 4 days',
-        category: 'this_month',
-    },
-    {
-        id: '5',
-        name: 'Priya Sharma',
-        classGrade: 'Class 9',
-        feeAmount: 1800,
-        dueFormatted: 'Due 25 Oct',
-        statusType: 'due_soon',
-        daysText: 'Due in 9 days',
-        category: 'this_month',
-    },
-];
-
 export default function PendingFees() {
-    const [students, setStudents] = useState<PendingStudentItem[]>(INITIAL_PENDING_STUDENTS);
+    const [students, setStudents] = useState<PendingStudentItem[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
     const [showExportModal, setShowExportModal] = useState(false);
 
+    // RTK Query backend integration
+    const { data: apiPendingRes, refetch: refetchPending } = useGetPendingFeesQuery(undefined);
+    const [recordPaymentApi] = useRecordTuitionPaymentMutation();
+
     React.useEffect(() => {
-        tuitionStorage.getPendingFees().then(persisted => {
-            if (persisted && persisted.length > 0) {
-                setStudents(persisted as any);
-            }
-        });
-    }, []);
+        if (apiPendingRes && Array.isArray(apiPendingRes.data)) {
+            const mapped: PendingStudentItem[] = apiPendingRes.data.map((item: any) => ({
+                id: item._id || item.id,
+                name: item.name || item.studentName || 'Student',
+                classGrade: item.classGrade || item.grade || '',
+                feeAmount: Number(item.feeAmount || item.amount || 0),
+                dueFormatted: item.dueFormatted || (item.dueDate ? `Due ${item.dueDate}` : 'Due Soon'),
+                statusType: item.statusType || (item.daysOverdue > 0 ? 'overdue' : 'due_soon'),
+                daysText: item.daysText || (item.daysOverdue > 0 ? `Overdue by ${item.daysOverdue} days` : 'Due soon'),
+                category: item.category || 'this_month',
+            }));
+            setStudents(mapped);
+        } else {
+            tuitionStorage.getPendingFees().then(persisted => {
+                if (persisted && persisted.length > 0) {
+                    setStudents(persisted as any);
+                }
+            });
+        }
+    }, [apiPendingRes]);
 
     // Record Payment Modal State
     const [selectedStudent, setSelectedStudent] = useState<PendingStudentItem | null>(null);
@@ -137,13 +104,14 @@ export default function PendingFees() {
     }, [students, searchQuery, activeFilter]);
 
     // Calculate dynamic totals for the summary cards
-    const { totalStudentsCount, totalPendingAmount } = useMemo(() => {
+    const summaryMetrics = useMemo(() => {
         const totalAmount = students.reduce((sum, item) => sum + item.feeAmount, 0);
         return {
             totalStudentsCount: students.length,
             totalPendingAmount: totalAmount,
         };
     }, [students]);
+    const { totalStudentsCount, totalPendingAmount } = summaryMetrics;
 
     const handleCardPress = (item: PendingStudentItem) => {
         navigate('StudentDetails', {
@@ -169,18 +137,33 @@ export default function PendingFees() {
         setIsPaymentModalVisible(true);
     };
 
-    const handleConfirmPayment = () => {
+    const handleConfirmPayment = async () => {
         if (!selectedStudent) return;
+        const amt = Number(paymentAmount) || selectedStudent.feeAmount;
 
-        // Remove the paid student from pending list
-        setStudents((prev) => prev.filter((s) => s.id !== selectedStudent.id));
-        setIsPaymentModalVisible(false);
+        const payload = {
+            amount: amt,
+            paymentMode,
+            date: new Date().toISOString(),
+        };
 
-        showFlashMessage(
-            `Payment of ₹${Number(paymentAmount).toLocaleString('en-IN')} for ${selectedStudent.name} recorded!`,
-            'success'
-        );
-        setSelectedStudent(null);
+        const res: any = await recordPaymentApi({
+            studentId: String(selectedStudent.id),
+            body: payload,
+        });
+
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || `Payment of ₹${amt.toLocaleString('en-IN')} for ${selectedStudent.name} recorded!`, 'success');
+            setStudents((prev) => prev.filter((s) => s.id !== selectedStudent.id));
+            setIsPaymentModalVisible(false);
+            setSelectedStudent(null);
+            refetchPending();
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to record payment', 'error');
+            return;
+        }
     };
 
     const feeExportColumns: ExportColumn[] = [

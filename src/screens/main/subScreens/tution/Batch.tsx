@@ -28,6 +28,16 @@ import ExportImportButton from '../../../../ui/components/ExportImportButton';
 import ExportImportModal from '../../../../ui/modals/ExportImportModal';
 import { ExportColumn } from '../../../../services/exportService';
 import { importService } from '../../../../services/importService';
+import { tuitionStorage } from '../../../../services/tuitionStorage';
+import { 
+    useGetBatchesQuery, 
+    useCreateBatchMutation, 
+    useRescheduleBatchMutation, 
+    useRecordTeacherLeaveMutation 
+} from '../../../../API';
+import { ShowToast } from '../../../../utils/CustomToast/ToastManager';
+import { useAppDispatch, useAppSelector } from '../../../../API/hooks/ReduxHooks';
+import { setTuitionBatches, addTuitionBatch } from '../../../../storage/redux/silce/TuitionSlice';
 
 export interface BatchStudent {
     id: string;
@@ -68,109 +78,56 @@ export interface TeacherLeaveRecord {
     leaveType: 'Teacher Absent' | 'Sick Leave' | 'Personal' | 'National Holiday' | 'Other';
 }
 
-const BATCH_DATA: BatchItem[] = [
-    {
-        id: '1',
-        title: 'Morning Juniors',
-        timing: '7:00 AM – 8:30 AM',
-        days: 'Mon – Sat',
-        classRange: 'Class 6 – 8',
-        studentsCount: 2,
-        attendanceMarked: false,
-        isToday: true,
-        students: [
-            {
-                id: 'kabir',
-                name: 'Kabir Singh',
-                classGrade: 'Class 6',
-                phone: '+91 98765 43210',
-                parentName: 'Ramesh Singh',
-                feeAmount: '₹1,200',
-                feeStatus: 'Due Soon',
-                subjects: ['Mathematics', 'Science'],
-            },
-            {
-                id: 'rahul',
-                name: 'Rahul Sharma',
-                classGrade: 'Class 8',
-                phone: '+91 98765 43211',
-                parentName: 'Anil Sharma',
-                feeAmount: '₹1,500',
-                feeStatus: 'Due Soon',
-                subjects: ['Science', 'English'],
-            },
-        ],
-    },
-    {
-        id: '2',
-        title: 'Evening Seniors',
-        timing: '5:00 PM – 7:00 PM',
-        days: 'Mon, Wed, Fri',
-        classRange: 'Class 9 – 10',
-        studentsCount: 2,
-        attendanceMarked: false,
-        isToday: true,
-        students: [
-            {
-                id: 'priya',
-                name: 'Priya Verma',
-                classGrade: 'Class 9',
-                phone: '+91 98765 43212',
-                parentName: 'Sanjay Verma',
-                feeAmount: '₹1,800',
-                feeStatus: 'Due Soon',
-                subjects: ['Physics', 'Chemistry', 'Biology'],
-            },
-            {
-                id: 'aman',
-                name: 'Aman Kumar',
-                classGrade: 'Class 10',
-                phone: '+91 98765 43213',
-                parentName: 'Vijay Kumar',
-                feeAmount: '₹2,000',
-                feeStatus: 'Overdue',
-                subjects: ['Mathematics', 'Science'],
-            },
-        ],
-    },
-    {
-        id: '3',
-        title: 'Board Prep',
-        timing: '7:30 PM – 9:00 PM',
-        days: 'Tue, Thu, Sat',
-        classRange: 'Class 11 – 12 · PCM/B',
-        studentsCount: 2,
-        attendanceMarked: false,
-        isToday: false,
-        students: [
-            {
-                id: 'sneha',
-                name: 'Sneha Iyer',
-                classGrade: 'Class 11',
-                phone: '+91 98765 43214',
-                parentName: 'Subramanian Iyer',
-                feeAmount: '₹10,000',
-                feeStatus: 'Overdue',
-                subjects: ['Physics', 'Chemistry', 'Maths'],
-            },
-            {
-                id: 'ishaan',
-                name: 'Ishaan Gupta',
-                classGrade: 'Class 12',
-                phone: '+91 98765 43215',
-                parentName: 'Manoj Gupta',
-                feeAmount: '₹3,500',
-                feeStatus: 'Paid',
-                subjects: ['Physics', 'Mathematics'],
-            },
-        ],
-    },
-];
-
 export default function Batch() {
-    const [batches, setBatches] = useState<BatchItem[]>(BATCH_DATA);
+    const dispatch = useAppDispatch();
+    const [createBatchApi] = useCreateBatchMutation();
+    const [rescheduleBatchApi] = useRescheduleBatchMutation();
+    const [recordTeacherLeaveApi] = useRecordTeacherLeaveMutation();
+
+    const [batches, setBatches] = useState<BatchItem[]>([]);
     const [selectedBatch, setSelectedBatch] = useState<BatchItem | null>(null);
     const [isBatchModalVisible, setIsBatchModalVisible] = useState(false);
+
+    // RTK Query backend integration
+    const { data: apiBatchesRes } = useGetBatchesQuery(undefined);
+
+    React.useEffect(() => {
+        if (apiBatchesRes && Array.isArray(apiBatchesRes.data)) {
+            const mapped: BatchItem[] = apiBatchesRes.data.map((b: any) => ({
+                id: b._id || b.id,
+                title: b.title || b.name,
+                timing: b.timing || '',
+                days: b.days || '',
+                classRange: b.classRange || (b.grades?.join(' – ') || ''),
+                studentsCount: b.studentsCount || (Array.isArray(b.students) ? b.students.length : 0),
+                attendanceMarked: Boolean(b.attendanceMarked),
+                isToday: Boolean(b.isToday),
+                students: (b.students || []).map((s: any) => ({
+                    id: s._id || s.id,
+                    name: s.name,
+                    classGrade: s.classGrade || s.grade || '',
+                    phone: s.phone || '',
+                    parentName: s.parentName || '',
+                    feeAmount: s.feeAmount ? `₹${s.feeAmount}` : '₹0',
+                    feeStatus: s.feeStatus || 'Paid',
+                    subjects: s.subjects || [],
+                })),
+                rescheduledTiming: b.rescheduledTiming,
+                rescheduledDate: b.rescheduledDate,
+                rescheduleType: b.rescheduleType,
+                rescheduleReason: b.rescheduleReason,
+                teacherLeaveReason: b.teacherLeaveReason,
+                teacherLeaveDate: b.teacherLeaveDate,
+            }));
+            setBatches(mapped);
+        } else {
+            tuitionStorage.getBatches().then(persisted => {
+                if (persisted && persisted.length > 0) {
+                    setBatches(persisted as any);
+                }
+            });
+        }
+    }, [apiBatchesRes]);
 
     // Add Batch Modal State
     const [isAddBatchModalVisible, setIsAddBatchModalVisible] = useState(false);
@@ -180,30 +137,29 @@ export default function Batch() {
     const [newBatchClassRange, setNewBatchClassRange] = useState('');
     const [newBatchIsToday, setNewBatchIsToday] = useState(false);
 
+    const getTodayFormatted = () => {
+        const d = new Date();
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${day}/${month}/${d.getFullYear()}`;
+    };
+
     // Reschedule Modal State
     const [isRescheduleModalVisible, setIsRescheduleModalVisible] = useState(false);
     const [rescheduleBatchTarget, setRescheduleBatchTarget] = useState<BatchItem | null>(null);
     const [rescheduleType, setRescheduleType] = useState<'single' | 'regular'>('single');
     const [rescheduleTiming, setRescheduleTiming] = useState('');
     const [rescheduleDays, setRescheduleDays] = useState('');
-    const [rescheduleDate, setRescheduleDate] = useState('16/10/2026');
+    const [rescheduleDate, setRescheduleDate] = useState(() => getTodayFormatted());
     const [rescheduleReason, setRescheduleReason] = useState('');
 
     // Teacher Leave State & Modal
-    const [teacherLeaves, setTeacherLeaves] = useState<TeacherLeaveRecord[]>([
-        {
-            id: '1',
-            date: '2 Oct 2026',
-            batchTitle: 'All Batches',
-            reason: 'Gandhi Jayanti · National Holiday',
-            leaveType: 'National Holiday',
-        },
-    ]);
+    const [teacherLeaves, setTeacherLeaves] = useState<TeacherLeaveRecord[]>([]);
     const [isTeacherLeaveModalVisible, setIsTeacherLeaveModalVisible] = useState(false);
     const [leaveBatchTarget, setLeaveBatchTarget] = useState<string>('All Batches');
     const [leaveType, setLeaveType] = useState<string>('Teacher Absent');
     const [leaveReason, setLeaveReason] = useState('');
-    const [leaveDate, setLeaveDate] = useState('16/10/2026');
+    const [leaveDate, setLeaveDate] = useState(() => getTodayFormatted());
     const [showExportModal, setShowExportModal] = useState(false);
 
     const todayBatches = batches.filter((b) => b.isToday);
@@ -244,33 +200,52 @@ export default function Batch() {
         });
     };
 
-    const handleCreateBatch = () => {
+    const handleCreateBatch = async () => {
         if (!newBatchTitle.trim()) {
-            showFlashMessage('Please enter batch title', 'error');
+            ShowToast('Please enter batch title', 'error');
             return;
         }
 
-        const newBatch: BatchItem = {
-            id: String(Date.now()),
+        const payload = {
             title: newBatchTitle.trim(),
             timing: newBatchTiming.trim() || '5:00 PM – 6:30 PM',
             days: newBatchDays.trim() || 'Mon, Wed, Fri',
             classRange: newBatchClassRange.trim() || 'Class 9 – 10',
-            studentsCount: 0,
-            attendanceMarked: false,
             isToday: newBatchIsToday,
-            students: [],
         };
 
-        setBatches((prev) => [newBatch, ...prev]);
-        setIsAddBatchModalVisible(false);
-        setNewBatchTitle('');
-        setNewBatchTiming('');
-        setNewBatchDays('');
-        setNewBatchClassRange('');
-        setNewBatchIsToday(false);
+        const res: any = await createBatchApi(payload);
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || `Batch "${newBatchTitle.trim()}" created successfully!`, 'success');
 
-        showFlashMessage(`Batch "${newBatch.title}" created successfully!`, 'success');
+            const newBatch: BatchItem = {
+                id: String(res?.data?.data?._id || res?.data?.data?.id || Date.now()),
+                title: newBatchTitle.trim(),
+                timing: newBatchTiming.trim() || '5:00 PM – 6:30 PM',
+                days: newBatchDays.trim() || 'Mon, Wed, Fri',
+                classRange: newBatchClassRange.trim() || 'Class 9 – 10',
+                studentsCount: 0,
+                attendanceMarked: false,
+                isToday: newBatchIsToday,
+                students: [],
+            };
+
+            setBatches((prev) => [newBatch, ...prev]);
+            dispatch(addTuitionBatch(newBatch));
+            tuitionStorage.saveBatches([newBatch, ...batches] as any);
+
+            setIsAddBatchModalVisible(false);
+            setNewBatchTitle('');
+            setNewBatchTiming('');
+            setNewBatchDays('');
+            setNewBatchClassRange('');
+            setNewBatchIsToday(false);
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to create batch', 'error');
+            return;
+        }
     };
 
     // Reschedule Handlers
@@ -279,65 +254,68 @@ export default function Batch() {
         setRescheduleType('single');
         setRescheduleTiming(batch.rescheduledTiming || batch.timing);
         setRescheduleDays(batch.days);
-        setRescheduleDate('16/10/2026');
+        setRescheduleDate(getTodayFormatted());
         setRescheduleReason(batch.rescheduleReason || '');
         setIsRescheduleModalVisible(true);
     };
 
-    const handleConfirmReschedule = () => {
+    const handleConfirmReschedule = async () => {
         if (!rescheduleBatchTarget) return;
         if (!rescheduleTiming.trim()) {
-            showFlashMessage('Please enter the new timing', 'error');
+            ShowToast('Please enter the new timing', 'error');
             return;
         }
 
-        setBatches((prev) =>
-            prev.map((b) => {
-                if (b.id === rescheduleBatchTarget.id) {
-                    if (rescheduleType === 'regular') {
+        const payload = {
+            timing: rescheduleTiming.trim(),
+            days: rescheduleType === 'regular' ? (rescheduleDays.trim() || rescheduleBatchTarget.days) : rescheduleBatchTarget.days,
+            rescheduledTiming: rescheduleType === 'single' ? rescheduleTiming.trim() : undefined,
+            rescheduledDate: rescheduleDate,
+            rescheduleType,
+            rescheduleReason: rescheduleReason.trim() || 'Single-day time shift',
+        };
+
+        const res: any = await rescheduleBatchApi({
+            batchId: String(rescheduleBatchTarget.id),
+            body: payload,
+        });
+
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || (rescheduleType === 'single' ? `Batch "${rescheduleBatchTarget.title}" rescheduled for today!` : `Batch "${rescheduleBatchTarget.title}" timing updated!`), 'success');
+
+            setBatches((prev) =>
+                prev.map((b) => {
+                    if (b.id === rescheduleBatchTarget.id) {
                         return {
                             ...b,
-                            timing: rescheduleTiming.trim(),
-                            days: rescheduleDays.trim() || b.days,
-                            rescheduledTiming: undefined,
-                            rescheduleType: 'regular',
-                            rescheduleReason: undefined,
-                        };
-                    } else {
-                        return {
-                            ...b,
-                            rescheduledTiming: rescheduleTiming.trim(),
-                            rescheduledDate: rescheduleDate,
-                            rescheduleType: 'single',
-                            rescheduleReason: rescheduleReason.trim() || 'Single-day time shift',
+                            ...payload,
                         };
                     }
-                }
-                return b;
-            })
-        );
-
-        if (selectedBatch?.id === rescheduleBatchTarget.id) {
-            setSelectedBatch((prev) =>
-                prev
-                    ? {
-                          ...prev,
-                          timing: rescheduleType === 'regular' ? rescheduleTiming.trim() : prev.timing,
-                          days: rescheduleType === 'regular' ? (rescheduleDays.trim() || prev.days) : prev.days,
-                          rescheduledTiming: rescheduleType === 'single' ? rescheduleTiming.trim() : undefined,
-                          rescheduleType,
-                      }
-                    : null
+                    return b;
+                })
             );
-        }
 
-        setIsRescheduleModalVisible(false);
-        showFlashMessage(
-            rescheduleType === 'single'
-                ? `Batch "${rescheduleBatchTarget.title}" rescheduled for today!`
-                : `Batch "${rescheduleBatchTarget.title}" regular timing updated!`,
-            'success'
-        );
+            if (selectedBatch?.id === rescheduleBatchTarget.id) {
+                setSelectedBatch((prev) =>
+                    prev
+                        ? {
+                            ...prev,
+                            timing: rescheduleType === 'regular' ? rescheduleTiming.trim() : prev.timing,
+                            days: rescheduleType === 'regular' ? (rescheduleDays.trim() || prev.days) : prev.days,
+                            rescheduledTiming: rescheduleType === 'single' ? rescheduleTiming.trim() : undefined,
+                            rescheduleType,
+                        }
+                        : null
+                );
+            }
+
+            setIsRescheduleModalVisible(false);
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to reschedule batch', 'error');
+            return;
+        }
     };
 
     const handleResetReschedule = (batchId: string) => {
@@ -360,10 +338,10 @@ export default function Batch() {
             setSelectedBatch((prev) =>
                 prev
                     ? {
-                          ...prev,
-                          rescheduledTiming: undefined,
-                          rescheduleType: undefined,
-                      }
+                        ...prev,
+                        rescheduledTiming: undefined,
+                        rescheduleType: undefined,
+                    }
                     : null
             );
         }
@@ -377,50 +355,71 @@ export default function Batch() {
         setLeaveBatchTarget(batchTitle || 'All Batches');
         setLeaveType('Teacher Absent');
         setLeaveReason('');
-        setLeaveDate('16/10/2026');
+        setLeaveDate(getTodayFormatted());
         setIsTeacherLeaveModalVisible(true);
     };
 
-    const handleConfirmTeacherLeave = () => {
+    const handleConfirmTeacherLeave = async () => {
         const finalReason = leaveReason.trim() || leaveType;
-        const newRecord: TeacherLeaveRecord = {
-            id: String(Date.now()),
+
+        const payload = {
             date: leaveDate,
-            batchTitle: leaveBatchTarget,
+            leaveType,
             reason: finalReason,
-            leaveType: leaveType as any,
+            batchTitle: leaveBatchTarget,
         };
 
-        setTeacherLeaves((prev) => [newRecord, ...prev]);
+        const res: any = await recordTeacherLeaveApi({
+            batchId: leaveBatchTarget === 'All Batches' ? 'all' : leaveBatchTarget,
+            body: payload,
+        });
 
-        // Update batches with leave status
-        setBatches((prev) =>
-            prev.map((b) => {
-                if (leaveBatchTarget === 'All Batches' || b.title === leaveBatchTarget) {
-                    return {
-                        ...b,
-                        teacherLeaveReason: finalReason,
-                        teacherLeaveDate: leaveDate,
-                    };
-                }
-                return b;
-            })
-        );
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || `Teacher leave recorded for ${leaveBatchTarget}!`, 'success');
 
-        if (selectedBatch && (leaveBatchTarget === 'All Batches' || selectedBatch.title === leaveBatchTarget)) {
-            setSelectedBatch((prev) =>
-                prev
-                    ? {
-                          ...prev,
-                          teacherLeaveReason: finalReason,
-                          teacherLeaveDate: leaveDate,
-                      }
-                    : null
+            const newRecord: TeacherLeaveRecord = {
+                id: String(res?.data?.data?._id || res?.data?.data?.id || Date.now()),
+                date: leaveDate,
+                batchTitle: leaveBatchTarget,
+                reason: finalReason,
+                leaveType: leaveType as any,
+            };
+
+            setTeacherLeaves((prev) => [newRecord, ...prev]);
+
+            // Update batches with leave status
+            setBatches((prev) =>
+                prev.map((b) => {
+                    if (leaveBatchTarget === 'All Batches' || b.title === leaveBatchTarget) {
+                        return {
+                            ...b,
+                            teacherLeaveReason: finalReason,
+                            teacherLeaveDate: leaveDate,
+                        };
+                    }
+                    return b;
+                })
             );
-        }
 
-        setIsTeacherLeaveModalVisible(false);
-        showFlashMessage(`Teacher leave recorded for ${leaveBatchTarget}!`, 'success');
+            if (selectedBatch && (leaveBatchTarget === 'All Batches' || selectedBatch.title === leaveBatchTarget)) {
+                setSelectedBatch((prev) =>
+                    prev
+                        ? {
+                            ...prev,
+                            teacherLeaveReason: finalReason,
+                            teacherLeaveDate: leaveDate,
+                        }
+                        : null
+                );
+            }
+
+            setIsTeacherLeaveModalVisible(false);
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to record leave', 'error');
+            return;
+        }
     };
 
     const handleCancelTeacherLeave = (leaveId: string) => {
@@ -445,10 +444,10 @@ export default function Batch() {
                 setSelectedBatch((prev) =>
                     prev
                         ? {
-                              ...prev,
-                              teacherLeaveReason: undefined,
-                              teacherLeaveDate: undefined,
-                          }
+                            ...prev,
+                            teacherLeaveReason: undefined,
+                            teacherLeaveDate: undefined,
+                        }
                         : null
                 );
             }
@@ -566,7 +565,7 @@ export default function Batch() {
     ];
 
     const batchExportRows = React.useMemo(() => {
-        return batches.map(b => ({
+        return batches.map((b: any) => ({
             title: b.title,
             timing: b.rescheduledTiming || b.timing,
             days: b.days,
@@ -619,7 +618,7 @@ Board Prep,7:30 PM – 9:00 PM,Tue · Thu · Sat,2,10,Class 12`;
                     if (rows.length === 0) {
                         return { success: false, message: 'No valid batch rows found', rowCount: 0 };
                     }
-                    const newBatches: BatchItem[] = rows.map((r, idx) => ({
+                    const newBatches: any = rows.map((r, idx) => ({
                         id: String(Date.now() + idx),
                         title: r['batchtitle'] || r['title'] || `Batch ${idx + 1}`,
                         timing: r['batchtiming'] || r['timing'] || '5:00 PM – 6:30 PM',
@@ -1086,7 +1085,7 @@ Board Prep,7:30 PM – 9:00 PM,Tue · Thu · Sat,2,10,Class 12`;
                                             <CustomText style={styles.inputLabel}>DATE</CustomText>
                                             <TextInput
                                                 style={styles.modalInput}
-                                                placeholder="16/10/2026"
+                                                placeholder="DD/MM/YYYY"
                                                 placeholderTextColor="#94A3B8"
                                                 value={rescheduleDate}
                                                 onChangeText={setRescheduleDate}
@@ -1225,7 +1224,7 @@ Board Prep,7:30 PM – 9:00 PM,Tue · Thu · Sat,2,10,Class 12`;
                                     <CustomText style={styles.inputLabel}>LEAVE DATE</CustomText>
                                     <TextInput
                                         style={styles.modalInput}
-                                        placeholder="16/10/2026"
+                                        placeholder="DD/MM/YYYY"
                                         placeholderTextColor="#94A3B8"
                                         value={leaveDate}
                                         onChangeText={setLeaveDate}

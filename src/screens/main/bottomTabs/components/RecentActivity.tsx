@@ -7,7 +7,6 @@ import { colors } from '../../../../utils/colors'
 import { FontMedium, FontRegular, FontSemiBold } from '../../../../utils/fontFamily'
 import { ACCOUNT_TYPES } from '../../../../assets/DefaultData'
 import Dots from '../../../../assets/images/icons/dots.svg'
-import { recentAData, recentData } from '../../../../assets/dummy/dummy'
 
 import Settle from '../../../../assets/images/icons/settle.svg'
 import BlackIn from '../../../../assets/images/icons/blackin.svg'

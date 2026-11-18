@@ -15,7 +15,7 @@ interface MonthlyStatsCardsProps {
 
 export default function MonthlyStatsCards({
     thisMonthCollected = 0,
-    thisMonthPending = 16500,
+    thisMonthPending = 0,
 }: MonthlyStatsCardsProps) {
     return (
         <View style={styles.container}>

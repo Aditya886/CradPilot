@@ -38,7 +38,9 @@ import SavingsIcon from '../assets/images/icons/bill.svg';
 import BudgetIcon from '../assets/images/icons/budget.svg';
 import CloseIcon from '../assets/images/icons/close.svg';
 import NextIcon from '../assets/images/icons/next.svg';
+import TutionIcon from '../assets/images/icons/tution.svg';
 import { ShowToast } from '../utils/CustomToast/ToastManager';
+import { useAppSelector } from '../utils/hooks';
 
 const Tab = createBottomTabNavigator();
 
@@ -52,6 +54,30 @@ function CustomTabBar({ state, navigation }: any) {
     ).current;
 
     const [showAddBox, setShowAddBox] = useState(false);
+    const currentPurpose = useAppSelector(state => state.app.purpose) || 'local';
+
+    const options = React.useMemo(() => {
+        if (currentPurpose === 'finance') {
+            return [
+                { id: 'new_loan', title: 'Add New Loan', icon: LoanIcon },
+                { id: 'emi_loans', title: 'Add EMI & Loans', icon: LoanIcon },
+                { id: 'savings_goals', title: 'Add Savings & Goals', icon: SavingsIcon },
+            ];
+        }
+        if (currentPurpose === 'tution') {
+            return [
+                { id: 'add_student', title: 'Add Student', icon: TutionIcon },
+                { id: 'savings_goals', title: 'Add Savings & Goals', icon: SavingsIcon },
+                { id: 'emi_loans', title: 'Add EMI & Loans', icon: LoanIcon },
+            ];
+        }
+        // Default: 'local'
+        return [
+            { id: 'add_txn', title: 'Add Transaction', icon: AddTxnIcon },
+            { id: 'add_plan', title: 'Add Plan / Trip', icon: BudgetIcon },
+            { id: 'savings_goals', title: 'Add Savings & Goals', icon: SavingsIcon },
+        ];
+    }, [currentPurpose]);
 
     useEffect(() => {
         const keyboardDidShowListener = Keyboard.addListener(
@@ -76,8 +102,6 @@ function CustomTabBar({ state, navigation }: any) {
             useNativeDriver: true,
         }).start();
     }, [showAddBox]);
-
-    if (keyboardVisible) return null;
 
     const handleCenterButtonPress = () => {
         setShowAddBox(prev => !prev);
@@ -107,24 +131,26 @@ function CustomTabBar({ state, navigation }: any) {
         return <IconComponent width={iconSize} height={iconSize} />;
     };
 
-    const options = [
-        { id: 'new_loan', title: 'Add New Loan', icon: LoanIcon },
-        { id: 'add_txn', title: 'Add Txn', icon: AddTxnIcon },
-        { id: 'savings_goals', title: 'Add Savings & Goals', icon: SavingsIcon },
-        { id: 'emi_loans', title: 'Add EMI & Loans', icon: LoanIcon },
-        { id: 'schedule_budgets', title: 'Schedule Budgets', icon: BudgetIcon },
-    ];
-
     const handleOptionPress = (id: string) => {
         setShowAddBox(false);
-        if (id === 'new_loan') {
-            navigation.navigate("NewLoan");
-        } else if (id === 'add_txn') {
+        if (id === 'add_txn') {
             navigation.navigate("Debts", { openAddTxn: true });
+        } else if (id === 'add_plan') {
+            navigation.navigate("PlanTrip", { openNewPlan: true });
+        } else if (id === 'new_loan') {
+            navigation.navigate("NewLoan");
+        } else if (id === 'add_student') {
+            navigation.navigate("AddStudent");
+        } else if (id === 'savings_goals') {
+            navigation.navigate("SavingAndGoals", { openAddGoal: true });
+        } else if (id === 'emi_loans') {
+            navigation.navigate("EmiLoans", { openAddLoan: true });
         } else {
             ShowToast("Coming Soon", "info");
         }
     };
+
+    if (keyboardVisible) return null;
 
     return (
         <>

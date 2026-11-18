@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     StyleSheet,
     ScrollView,
@@ -27,106 +27,13 @@ import { importService } from '../../../../services/importService';
 import { ExportColumn } from '../../../../services/exportService';
 import ExportImportModal from '../../../../ui/modals/ExportImportModal';
 import ExportImportButton from '../../../../ui/components/ExportImportButton';
+import { useGetStudentsQuery, useGetBatchesQuery } from '../../../../API';
+import { useAppDispatch, useAppSelector } from '../../../../API/hooks/ReduxHooks';
+import { setTuitionStudents } from '../../../../storage/redux/silce/TuitionSlice';
+import { ActivityIndicator } from 'react-native';
 
 
-const INITIAL_STUDENTS: StudentItem[] = [
-    {
-        id: '1',
-        name: 'Aman Kumar',
-        classGrade: 'Class 10',
-        parentName: 'Rekha Kumar',
-        phone: '99582 11870',
-        subjects: ['Mathematics', 'Physics'],
-        batchName: 'Evening Seniors',
-        batchTiming: '5:00 PM – 7:00 PM',
-        feeAmount: 2000,
-        feePeriod: 'month',
-        feeStatus: 'Overdue',
-        dueInfo: 'Next due 3 Oct',
-        attendanceStatus: 'Not marked',
-        isActive: true,
-    },
-    {
-        id: '2',
-        name: 'Ishaan Gupta',
-        classGrade: 'Class 12',
-        parentName: 'Meera Gupta',
-        phone: '88004 77211',
-        subjects: ['Physics', 'Chemistry', 'Mathematics'],
-        batchName: 'Board Prep',
-        batchTiming: '7:30 PM – 9:00 PM',
-        feeAmount: 12000,
-        feePeriod: 'semester',
-        feeStatus: 'Paid',
-        dueInfo: 'Fully paid',
-        attendanceStatus: 'Not marked',
-        isActive: true,
-    },
-    {
-        id: '3',
-        name: 'Kabir Singh',
-        classGrade: 'Class 6',
-        parentName: 'Harpreet Singh',
-        phone: '93120 55643',
-        subjects: ['Mathematics'],
-        batchName: 'Morning Juniors',
-        batchTiming: '7:00 AM – 8:30 AM',
-        feeAmount: 1200,
-        feePeriod: 'month',
-        feeStatus: 'Due Soon',
-        dueInfo: 'Next due 20 Oct',
-        attendanceStatus: 'Not marked',
-        isActive: true,
-    },
-    {
-        id: '4',
-        name: 'Sneha Iyer',
-        classGrade: 'Class 11',
-        parentName: 'Venkatesh Iyer',
-        phone: '98201 44321',
-        subjects: ['Mathematics', 'Chemistry'],
-        batchName: 'Evening Seniors',
-        batchTiming: '5:00 PM – 7:00 PM',
-        feeAmount: 10000,
-        feePeriod: 'semester',
-        feeStatus: 'Overdue',
-        dueInfo: 'Next due 15 Sept',
-        attendanceStatus: 'Not marked',
-        isActive: true,
-    },
-    {
-        id: '5',
-        name: 'Rahul Sharma',
-        classGrade: 'Class 9',
-        parentName: 'Rajesh Sharma',
-        phone: '98112 33455',
-        subjects: ['Science', 'Mathematics'],
-        batchName: 'Morning Juniors',
-        batchTiming: '7:00 AM – 8:30 AM',
-        feeAmount: 1500,
-        feePeriod: 'month',
-        feeStatus: 'Due Soon',
-        dueInfo: 'Next due 17 Oct',
-        attendanceStatus: 'Not marked',
-        isActive: true,
-    },
-    {
-        id: '6',
-        name: 'Priya Patel',
-        classGrade: 'Class 10',
-        parentName: 'Suresh Patel',
-        phone: '98765 12340',
-        subjects: ['English', 'Social Science'],
-        batchName: 'Evening Seniors',
-        batchTiming: '4:00 PM – 5:30 PM',
-        feeAmount: 1800,
-        feePeriod: 'month',
-        feeStatus: 'Paid',
-        dueInfo: 'Fully paid',
-        attendanceStatus: 'Not marked',
-        isActive: true,
-    },
-];
+const INITIAL_STUDENTS: StudentItem[] = [];
 
 const STATUS_FILTERS = [
     'All',
@@ -134,13 +41,6 @@ const STATUS_FILTERS = [
     'Fee Pending',
     'Fee Paid',
     'Overdue',
-];
-
-const BATCH_OPTIONS = [
-    'All batches',
-    'Evening Seniors',
-    'Board Prep',
-    'Morning Juniors',
 ];
 
 const SORT_OPTIONS = [
@@ -170,6 +70,10 @@ Ishaan Gupta,Class 12,Meera Gupta,88004 77211,Board Prep,12000,Paid,Fully paid
 Kabir Singh,Class 6,Harpreet Singh,93120 55643,Morning Juniors,1200,Due Soon,Next due 20 Oct`;
 
 export default function Students() {
+    const dispatch = useAppDispatch();
+    const reduxStudents = useAppSelector(state => state.tuition.students);
+    const reduxBatches = useAppSelector(state => state.tuition.batches);
+
     const [studentsList, setStudentsList] = useState<StudentItem[]>(INITIAL_STUDENTS);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedStatus, setSelectedStatus] = useState('All');
@@ -179,6 +83,51 @@ export default function Students() {
     const [batchModalVisible, setBatchModalVisible] = useState(false);
     const [sortModalVisible, setSortModalVisible] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
+
+    // Real API integration
+    const { data: apiStudentsRes, isLoading: isApiLoading, refetch: refetchStudents } = useGetStudentsQuery();
+    const { data: apiBatchesRes } = useGetBatchesQuery(undefined);
+
+    // Dynamic batches from Redux / API
+    const batchOptions = useMemo(() => {
+        const list = ['All batches'];
+        const sourceBatches = (reduxBatches && reduxBatches.length > 0)
+            ? reduxBatches
+            : (apiBatchesRes && Array.isArray(apiBatchesRes.data) ? apiBatchesRes.data : []);
+
+        sourceBatches.forEach((b: any) => {
+            const name = b.title || b.name;
+            if (name && !list.includes(name)) list.push(name);
+        });
+
+        studentsList.forEach((s) => {
+            if (s.batchName && !list.includes(s.batchName)) list.push(s.batchName);
+        });
+        return list;
+    }, [reduxBatches, apiBatchesRes, studentsList]);
+
+    useEffect(() => {
+        if (apiStudentsRes && Array.isArray(apiStudentsRes.data)) {
+            const mapped: StudentItem[] = apiStudentsRes.data.map((s: any) => ({
+                id: s._id || s.id,
+                name: s.name,
+                classGrade: s.classGrade,
+                parentName: s.parentName,
+                phone: s.phone,
+                subjects: s.subjects || [],
+                batchName: s.batchName || 'General',
+                batchTiming: s.batchTiming || '',
+                feeAmount: Number(s.feeAmount) || 0,
+                feePeriod: s.feePeriod || 'month',
+                feeStatus: s.feeStatus || 'Due Soon',
+                dueInfo: s.nextDueDate ? `Next due ${new Date(s.nextDueDate).toLocaleDateString('en-GB')}` : 'Due soon',
+                attendanceStatus: 'Not marked',
+                isActive: s.isActive !== false,
+            }));
+            setStudentsList(mapped);
+            dispatch(setTuitionStudents(mapped as any));
+        }
+    }, [apiStudentsRes, dispatch]);
 
     // Load persisted students from tuitionStorage
     const refreshStudents = async () => {
@@ -190,11 +139,12 @@ export default function Students() {
 
     React.useEffect(() => {
         refreshStudents();
+        refetchStudents();
         const unsubscribe = tuitionStorage.subscribe(() => {
             refreshStudents();
         });
         return () => unsubscribe();
-    }, []);
+    }, [refetchStudents]);
 
     // Filter and Sort students
     const filteredStudents = useMemo(() => {
@@ -427,7 +377,7 @@ export default function Students() {
                 >
                     <View style={styles.modalContent}>
                         <CustomText style={styles.modalTitle}>Filter by Batch</CustomText>
-                        {BATCH_OPTIONS.map((batch) => {
+                        {batchOptions.map((batch) => {
                             const isSelected = selectedBatch === batch;
                             return (
                                 <TouchableOpacity

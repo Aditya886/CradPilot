@@ -12,8 +12,9 @@ import Down from '../../assets/images/icons/down.svg';
 import CalendarModal from './CalendarModal';
 import { insert } from '../../storage/local/sqlite';
 import Toast from 'react-native-toast-message';
-import { syncNotifications } from '../../services/localNotificationService';
 import { subscriptionService } from '../../services/subscriptionService';
+import { useCreateDebtTransactionMutation, extractApiErrorMessage } from '../../API';
+import { ShowToast } from '../../utils/CustomToast/ToastManager';
 
 // Inline Svg for Calendar Icon
 import Svg, { Rect, Path } from 'react-native-svg';
@@ -41,6 +42,7 @@ export default function AddDebtTxnModal({
 }: AddDebtTxnModalProps) {
     const transformY = useRef(new Animated.Value(resHeight(100))).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
+    const [createDebtTxnApi, { isLoading: isSubmitting }] = useCreateDebtTransactionMutation();
 
     const [selectedPerson, setSelectedPerson] = useState<any>(null);
     const [amount, setAmount] = useState('');
@@ -112,7 +114,7 @@ export default function AddDebtTxnModal({
         }).start(() => setShow(false));
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (isButtonDisabled) return;
 
         const check = subscriptionService.canAddEntry();
@@ -139,34 +141,37 @@ export default function AddDebtTxnModal({
             dbType = 'done';
         }
 
-        try {
-            insert('debt_transactions', {
-                person_id: selectedPerson.id,
-                amount: parsedAmount,
-                type: dbType,
-                date: date.trim(),
-                mode: method,
-                notes: notes.trim() || null,
-            });
+        const payload = {
+            personId: String(selectedPerson.id),
+            amount: parsedAmount,
+            type: dbType,
+            mode: method,
+            date: date.trim() ? new Date(date.trim().split('/').reverse().join('-')).toISOString() : new Date().toISOString(),
+            notes: notes.trim() || undefined,
+        };
 
-            // Sync notifications
-            syncNotifications();
+        const res: any = await createDebtTxnApi(payload);
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || 'Transaction added successfully!', 'success');
 
-            Toast.show({
-                type: 'success',
-                text1: 'Success',
-                text2: 'Transaction added successfully!',
-            });
+            try {
+                insert('debt_transactions', {
+                    person_id: selectedPerson.id,
+                    amount: parsedAmount,
+                    type: dbType,
+                    date: date.trim(),
+                    mode: method,
+                    notes: notes.trim() || null,
+                });
+            } catch (err) {}
 
             onAddSuccess();
             close();
-        } catch (error) {
-            console.error('Error adding debt transaction:', error);
-            Toast.show({
-                type: 'error',
-                text1: 'Error',
-                text2: 'Failed to record transaction.',
-            });
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to record transaction', 'error');
+            return;
         }
     };
 

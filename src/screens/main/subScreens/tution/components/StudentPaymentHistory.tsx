@@ -18,29 +18,8 @@ interface StudentPaymentHistoryProps {
     history?: PaymentRecord[];
 }
 
-const DEFAULT_HISTORY: PaymentRecord[] = [
-    {
-        id: '1',
-        monthTitle: 'September 2026',
-        paidDetail: 'Paid 3 Sept · Cash',
-        amount: 2000,
-    },
-    {
-        id: '2',
-        monthTitle: 'August 2026',
-        paidDetail: 'Paid 3 Aug · Bank Transfer',
-        amount: 2000,
-    },
-    {
-        id: '3',
-        monthTitle: 'July 2026',
-        paidDetail: 'Paid 3 Jul · Cash',
-        amount: 2000,
-    },
-];
-
 export default function StudentPaymentHistory({
-    history = DEFAULT_HISTORY,
+    history = [],
 }: StudentPaymentHistoryProps) {
     return (
         <View style={styles.wrapper}>

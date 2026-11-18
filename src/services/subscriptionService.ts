@@ -2,6 +2,8 @@ import { query, masterQuery } from '../storage/local/sqlite';
 import AsyncStorageUtils from '../utils/storage';
 import { store } from '../storage/redux/store';
 import { setIsPremium, setAppPurpose, AppPurpose } from '../storage/redux/silce/AuthSlice';
+import { subscriptionApi } from '../API/api/SubscriptionApi';
+import { userApi } from '../API/api/UserApi';
 
 export interface SubscriptionModalOptions {
     visible: boolean;
@@ -67,6 +69,17 @@ class SubscriptionService {
         store.dispatch(setIsPremium(isPremium));
 
         try {
+            // Update backend subscription state
+            if (isPremium) {
+                store.dispatch(subscriptionApi.endpoints.upgradeSubscription.initiate({ planId: 'pro_monthly' }));
+            } else {
+                store.dispatch(subscriptionApi.endpoints.cancelSubscription.initiate());
+            }
+        } catch (apiErr) {
+            console.log('[SubscriptionService] backend sync note:', apiErr);
+        }
+
+        try {
             // Update AsyncStorage session
             const session = await AsyncStorageUtils.getItem('user_session') || {};
             session.isPremium = isPremium;
@@ -87,6 +100,13 @@ class SubscriptionService {
     async setPurpose(purpose: AppPurpose): Promise<void> {
         this.purposeCached = purpose;
         store.dispatch(setAppPurpose(purpose));
+
+        try {
+            // Update backend user purpose
+            store.dispatch(userApi.endpoints.updatePurpose.initiate({ purpose }));
+        } catch (apiErr) {
+            console.log('[SubscriptionService] backend purpose sync note:', apiErr);
+        }
 
         try {
             const session = await AsyncStorageUtils.getItem('user_session') || {};

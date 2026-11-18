@@ -45,7 +45,7 @@ export default function ExportImportButton({
 const styles = StyleSheet.create({
     btn: {
         paddingHorizontal: resAvarage(1),
-        paddingVertical: resAvarage(0.8),
+        // paddingVertical: resAvarage(0.8),
         borderRadius: resAvarage(10),
         justifyContent: 'center',
         alignItems: 'center',
@@ -70,6 +70,8 @@ const styles = StyleSheet.create({
     },
     icon: {
         fontSize: font18,
+        lineHeight: font18 * 1.2,
+        marginBottom: resAvarage(0.7),
         fontFamily: FontBold,
         color: colors.black,
     },

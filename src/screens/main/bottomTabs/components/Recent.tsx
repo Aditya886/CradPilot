@@ -7,7 +7,6 @@ import { colors } from '../../../../utils/colors'
 import { FontMedium, FontRegular, FontSemiBold } from '../../../../utils/fontFamily'
 import { ACCOUNT_TYPES } from '../../../../assets/DefaultData'
 import Dots from '../../../../assets/images/icons/dots.svg'
-import { recentData } from '../../../../assets/dummy/dummy'
 import { Menu, MenuOption, MenuOptions, MenuTrigger } from 'react-native-popup-menu'
 import Edit from '../../../../assets/images/icons/edit.svg'
 import Delete from '../../../../assets/images/icons/delete.svg'
@@ -21,7 +20,7 @@ export default function Recent() {
             </View>
             <View>
                 <FlatList
-                    data={recentData}
+                    data={[]}
                     contentContainerStyle={styles.card}
                     scrollEnabled={false}
                     removeClippedSubviews={false}

@@ -20,16 +20,37 @@ import ExportImportModal from '../../../../ui/modals/ExportImportModal';
 import { ExportColumn } from '../../../../services/exportService';
 import { importService } from '../../../../services/importService';
 import { tuitionStorage } from '../../../../services/tuitionStorage';
+import { useGetTuitionDashboardQuery } from '../../../../API';
+import { useFocusEffect } from '@react-navigation/native';
+import { useAppDispatch } from '../../../../API/hooks/ReduxHooks';
+import { setTuitionDashboard } from '../../../../storage/redux/silce/TuitionSlice';
 
 export default function TutionSection({ isHomeScreen }: any) {
+    const dispatch = useAppDispatch();
     const [showFooter, setShowFooter] = useState(true);
     const [showExportModal, setShowExportModal] = useState(false);
     const [students, setStudents] = useState<any[]>([]);
+
+    // Real API integration
+    const { data: dashboardRes, refetch: refetchDashboard } = useGetTuitionDashboardQuery();
 
     const loadStudents = async () => {
         const data = await tuitionStorage.getStudents();
         setStudents(data);
     };
+
+    React.useEffect(() => {
+        if (dashboardRes?.data) {
+            dispatch(setTuitionDashboard(dashboardRes.data));
+        }
+    }, [dashboardRes, dispatch]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+            loadStudents();
+            refetchDashboard();
+        }, [refetchDashboard])
+    );
 
     React.useEffect(() => {
         loadStudents();
@@ -38,6 +59,12 @@ export default function TutionSection({ isHomeScreen }: any) {
         });
         return () => unsub();
     }, []);
+
+    const dashboardData = dashboardRes?.data || {};
+    const totalFeeCollected = dashboardData.totalFeeCollected || 0;
+    const pendingAmount = dashboardData.pendingAmount || 0;
+    const activeStudents = dashboardData.activeStudents || students.length || 0;
+    const upcomingDues = dashboardData.upcomingDues || [];
 
     const handleAdd = () => {
         navigate('AddStudent');
@@ -68,17 +95,17 @@ export default function TutionSection({ isHomeScreen }: any) {
             student: {
                 id: String(item.id),
                 name: item.name,
-                classGrade: 'Class 10',
-                parentName: 'Parent of ' + item.name,
-                phone: '+91 98765 43210',
-                subjects: ['Mathematics', 'Physics'],
-                batchName: 'Evening Seniors',
-                batchTiming: '5:00 PM – 7:00 PM',
+                classGrade: (item as any).classGrade || 'Class 10',
+                parentName: (item as any).parentName || 'Parent of ' + item.name,
+                phone: (item as any).phone || '',
+                subjects: (item as any).subjects || [],
+                batchName: (item as any).batchName || 'General',
+                batchTiming: (item as any).batchTiming || '',
                 feeAmount: item.amount,
-                feePeriod: 'month',
+                feePeriod: (item as any).feePeriod || 'month',
                 feeStatus: item.status,
                 dueInfo: item.dueDate,
-                attendanceStatus: 'Present',
+                attendanceStatus: 'Not marked',
                 isActive: true,
             },
         });
@@ -132,14 +159,14 @@ export default function TutionSection({ isHomeScreen }: any) {
                 contentContainerStyle={[styles.scrollContent, isHomeScreen && { paddingBottom: resAvarage(22) }]}
             >
                 <TuitionTotalCard
-                    totalFeeCollected={26100}
-                    pendingAmount={16500}
-                    activeStudents={6}
+                    totalFeeCollected={totalFeeCollected}
+                    pendingAmount={pendingAmount}
+                    activeStudents={activeStudents}
                 />
 
                 <MonthlyStatsCards
-                    thisMonthCollected={0}
-                    thisMonthPending={16500}
+                    thisMonthCollected={totalFeeCollected}
+                    thisMonthPending={pendingAmount}
                 />
 
                 <TuitionQuickActions
@@ -151,6 +178,7 @@ export default function TutionSection({ isHomeScreen }: any) {
                 />
 
                 <UpcomingDuesCard
+                    dues={upcomingDues}
                     onPressSeeAll={handleSeeAllDues}
                     onPressItem={handleDueItemPress}
                     onPressAddPayment={handleAddPayment}

@@ -1,38 +1,30 @@
-import { baseApi } from './baseApi';
-
-import {
-    createGet,
-    createPost,
-} from './Helper';
-
-const url = {
-    login: 'auth/login',
-    signup: 'auth/signup',
-    getUser: 'auth/get-user',
-}
+import { baseApi } from './BaseApi';
+import { createPost } from './Helper';
 
 export const authApi = baseApi.injectEndpoints({
     endpoints: (builder) => ({
-
-        login: builder.mutation(
-            createPost(url.login)
+        login: builder.mutation<any, any>(
+            createPost('auth/login')
         ),
-
-        signUp: builder.mutation(
-            createPost(url.signup)
+        sendSignupOtp: builder.mutation<any, any>(
+            createPost('auth/signup/send-otp')
         ),
-
-        getUser: builder.query({
-            ...createGet('/api/get-user'),
-
-            providesTags: ['User'],
-        }),
-
+        verifySignup: builder.mutation<any, any>(
+            createPost('auth/signup/verify')
+        ),
+        sendForgotPasswordOtp: builder.mutation<any, any>(
+            createPost('auth/forgot-password/send-otp')
+        ),
+        verifyResetPassword: builder.mutation<any, any>(
+            createPost('auth/forgot-password/verify-reset')
+        ),
     }),
 });
 
 export const {
     useLoginMutation,
-    useSignUpMutation,
-    useGetUserQuery,
+    useSendSignupOtpMutation,
+    useVerifySignupMutation,
+    useSendForgotPasswordOtpMutation,
+    useVerifyResetPasswordMutation,
 } = authApi;

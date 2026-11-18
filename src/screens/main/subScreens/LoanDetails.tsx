@@ -22,9 +22,13 @@ import { query, getOne, insert, update, remove, getWhere } from '../../../storag
 import { goBack } from '../../../navigation/NavigationUtils'
 import AddAmountModal from '../../../ui/modals/AddAmountModal'
 import { calculateExpectedInterest } from '../../../utils/FormatUtil'
-import { syncNotifications } from '../../../services/localNotificationService'
+import { useRecordLoanPaymentMutation, useDeleteLoanMutation, useDeleteBorrowerMutation } from '../../../API'
+import { ShowToast } from '../../../utils/CustomToast/ToastManager'
 
 export default function LoanDetails({ route }: any) {
+    const [recordLoanPaymentApi] = useRecordLoanPaymentMutation()
+    const [deleteLoanApi] = useDeleteLoanMutation()
+    const [deleteBorrowerApi] = useDeleteBorrowerMutation()
     const { item: initialItem, name } = route?.params;
     
     // React state to make screen reactive
@@ -339,7 +343,7 @@ export default function LoanDetails({ route }: any) {
     }, [monthsData]);
 
     // Current year selected for the monthly grid view
-    const currentYear = uniqueYears[selectedYearIndex] || 2026;
+    const currentYear = uniqueYears[selectedYearIndex] || new Date().getFullYear();
 
     // Filter months to only display the ones matching the selected year page
     const monthsForCurrentYear = React.useMemo(() => {
@@ -352,7 +356,7 @@ export default function LoanDetails({ route }: any) {
     }, [uniqueYears]);
 
     // Handler to record a payment
-    const handleRecordPayment = (data: {
+    const handleRecordPayment = async (data: {
         amount: number;
         date: string;
         method: string;
@@ -375,27 +379,47 @@ export default function LoanDetails({ route }: any) {
 
         const newOutstanding = Math.max(0, outstandingAmount - principalAllocated);
 
-        try {
-            insert('payments', {
-                loan_id: loan.id,
-                amount: data.amount,
-                date: data.date,
-                mode: data.method.toLowerCase(),
-                to_principal: principalAllocated,
-                to_interest: interestAllocated,
-                balance_after: Math.round(newOutstanding),
-                notes: data.notes || ''
-            });
+        const payload = {
+            amount: data.amount,
+            date: data.date ? new Date(data.date.split('/').reverse().join('-')).toISOString() : new Date().toISOString(),
+            mode: data.method.toLowerCase(),
+            toPrincipal: principalAllocated,
+            toInterest: interestAllocated,
+            notes: data.notes || '',
+        };
 
-            // Update loan status if principal becomes 0
-            if (newOutstanding <= 0) {
-                update('loans', loan.id, { status: 'Completed' });
-            }
+        const res: any = await recordLoanPaymentApi({
+            loanId: String(loan.id),
+            body: payload,
+        });
+
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || 'Payment recorded successfully', 'success');
+
+            try {
+                insert('payments', {
+                    loan_id: loan.id,
+                    amount: data.amount,
+                    date: data.date,
+                    mode: data.method.toLowerCase(),
+                    to_principal: principalAllocated,
+                    to_interest: interestAllocated,
+                    balance_after: Math.round(newOutstanding),
+                    notes: data.notes || ''
+                });
+
+                if (newOutstanding <= 0) {
+                    update('loans', loan.id, { status: 'Completed' });
+                }
+            } catch (err) {}
 
             loadLoanData();
-            syncNotifications();
-        } catch (error) {
-            console.error('Failed to record payment in database:', error);
+            setShowAddModal(false);
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to record payment', 'error');
+            return;
         }
     };
 
@@ -423,7 +447,6 @@ export default function LoanDetails({ route }: any) {
             }
 
             loadLoanData();
-            syncNotifications();
         } catch (error) {
             console.error('Failed to add amount in database:', error);
         }
@@ -449,21 +472,29 @@ export default function LoanDetails({ route }: any) {
             }
 
             loadLoanData();
-            syncNotifications();
             setSelectedPaymentIndex(null);
         } catch (error) {
             console.error('Failed to delete payment from database:', error);
         }
     };
 
-    const handleDeleteLoan = () => {
-        try {
-            query('DELETE FROM payments WHERE loan_id = ?', [initialItem.id]);
-            query('DELETE FROM loans WHERE id = ?', [initialItem.id]);
-            syncNotifications();
+    const handleDeleteLoan = async () => {
+        const res: any = await deleteLoanApi(String(initialItem.id));
+        if (res?.data?.success || (res?.data && !res?.error)) {
+            console.log("res -----", res);
+            ShowToast(res?.data?.message || 'Loan deleted successfully', 'info');
+
+            try {
+                query('DELETE FROM payments WHERE loan_id = ?', [initialItem.id]);
+                query('DELETE FROM loans WHERE id = ?', [initialItem.id]);
+            } catch (err) {}
+
+            setShowDeleteLoanModal(false);
             goBack();
-        } catch (e) {
-            console.error("Error deleting loan:", e);
+        } else {
+            console.log("res error -----", res);
+            ShowToast(res?.error?.data?.message || res?.data?.message || 'Failed to delete loan', 'error');
+            return;
         }
     };
 
@@ -479,7 +510,6 @@ export default function LoanDetails({ route }: any) {
                 }
                 query('DELETE FROM borrowers WHERE id = ?', [borrower.id]);
             }
-            syncNotifications();
             goBack();
         } catch (e) {
             console.error("Error deleting borrower:", e);
